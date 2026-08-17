@@ -1,0 +1,177 @@
+/* ==========================================================================
+   CSS Design Tokens & Theme Variables
+   Editor de MER Conceptual v2.0
+   ========================================================================== */
+
+:root {
+  /* Common Colors & Brand */
+  --color-primary: #3b82f6;
+  --color-primary-hover: #2563eb;
+  --color-primary-active: #1d4ed8;
+  --color-primary-subtle: rgba(59, 130, 246, 0.15);
+  --color-primary-glow: rgba(59, 130, 246, 0.4);
+
+  --color-accent: #8b5cf6;
+  --color-accent-hover: #7c3aed;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #06b6d4;
+
+  /* Typography */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, 'Courier New', monospace;
+  --font-size-xs: 0.75rem;     /* 12px */
+  --font-size-sm: 0.8125rem;   /* 13px */
+  --font-size-base: 0.875rem;  /* 14px */
+  --font-size-md: 1rem;        /* 16px */
+  --font-size-lg: 1.125rem;    /* 18px */
+  --font-size-xl: 1.25rem;     /* 20px */
+  --font-size-2xl: 1.5rem;     /* 24px */
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: 350ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Layout dimensions */
+  --header-height: 56px;
+  --toolbar-width: 72px;
+  --sidebar-width: 320px;
+  --z-canvas: 1;
+  --z-overlay: 10;
+  --z-header: 20;
+  --z-sidebar: 30;
+  --z-modal-backdrop: 100;
+  --z-modal: 110;
+  --z-toast: 200;
+}
+
+/* --------------------------------------------------------------------------
+   DARK THEME (Default)
+   -------------------------------------------------------------------------- */
+[data-theme="dark"] {
+  --bg-app: #0f172a;
+  --bg-surface: #1e293b;
+  --bg-surface-elevated: #283548;
+  --bg-surface-hover: #334155;
+  --bg-canvas: #090d16;
+  
+  --border-subtle: #334155;
+  --border-strong: #475569;
+  --border-focus: #60a5fa;
+
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+  --text-inverse: #0f172a;
+
+  /* Canvas SVG Theme */
+  --grid-dot-color: rgba(148, 163, 184, 0.12);
+  --grid-line-color: rgba(148, 163, 184, 0.05);
+
+  --shape-entity-bg: #1e293b;
+  --shape-entity-stroke: #3b82f6;
+  --shape-entity-text: #f8fafc;
+
+  --shape-relation-bg: #2d1f47;
+  --shape-relation-stroke: #a855f7;
+  --shape-relation-text: #f8fafc;
+
+  --shape-attribute-bg: #0f2c3d;
+  --shape-attribute-stroke: #06b6d4;
+  --shape-attribute-text: #f8fafc;
+
+  --shape-primary-bg: #3b280c;
+  --shape-primary-stroke: #f59e0b;
+  --shape-primary-text: #fef3c7;
+
+  --shape-multivalued-bg: #11362e;
+  --shape-multivalued-stroke: #10b981;
+  --shape-multivalued-text: #ecfdf5;
+
+  --shape-derived-bg: #2d1828;
+  --shape-derived-stroke: #ec4899;
+  --shape-derived-text: #fdf2f8;
+
+  --line-stroke: #64748b;
+  --line-stroke-selected: #60a5fa;
+  --cardinality-bg: #1e293b;
+  --cardinality-text: #93c5fd;
+
+  --selection-glow: 0 0 0 3px rgba(96, 165, 250, 0.45);
+  --selection-shadow: drop-shadow(0 0 8px rgba(96, 165, 250, 0.65));
+
+  /* Glassmorphism */
+  --glass-bg: rgba(30, 41, 59, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 12px 32px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* --------------------------------------------------------------------------
+   LIGHT THEME
+   -------------------------------------------------------------------------- */
+[data-theme="light"] {
+  --bg-app: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #f1f5f9;
+  --bg-surface-hover: #e2e8f0;
+  --bg-canvas: #f1f5f9;
+  
+  --border-subtle: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --border-focus: #3b82f6;
+
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-subtle: #94a3b8;
+  --text-inverse: #ffffff;
+
+  /* Canvas SVG Theme */
+  --grid-dot-color: rgba(100, 116, 139, 0.2);
+  --grid-line-color: rgba(100, 116, 139, 0.08);
+
+  --shape-entity-bg: #eff6ff;
+  --shape-entity-stroke: #2563eb;
+  --shape-entity-text: #1e3a8a;
+
+  --shape-relation-bg: #faf5ff;
+  --shape-relation-stroke: #9333ea;
+  --shape-relation-text: #581c87;
+
+  --shape-attribute-bg: #ecfeff;
+  --shape-attribute-stroke: #0891b2;
+  --shape-attribute-text: #164e63;
+
+  --shape-primary-bg: #fffbeb;
+  --shape-primary-stroke: #d97706;
+  --shape-primary-text: #78350f;
+
+  --shape-multivalued-bg: #ecfdf5;
+  --shape-multivalued-stroke: #059669;
+  --shape-multivalued-text: #064e3b;
+
+  --shape-derived-bg: #fdf2f8;
+  --shape-derived-stroke: #db2777;
+  --shape-derived-text: #831843;
+
+  --line-stroke: #94a3b8;
+  --line-stroke-selected: #2563eb;
+  --cardinality-bg: #ffffff;
+  --cardinality-text: #1d4ed8;
+
+  --selection-glow: 0 0 0 3px rgba(37, 99, 235, 0.35);
+  --selection-shadow: drop-shadow(0 0 6px rgba(37, 99, 235, 0.5));
+
+  /* Glassmorphism */
+  --glass-bg: rgba(255, 255, 255, 0.9);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-shadow: 0 12px 32px 0 rgba(0, 0, 0, 0.08);
+}

@@ -1,0 +1,499 @@
+/* ==========================================================================
+   Canvas & SVG Elements Styling
+   Editor de MER Conceptual v2.2
+   ========================================================================== */
+
+.canvas-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+/* Background Pattern */
+.canvas-grid-pattern {
+  fill: var(--grid-dot-color);
+}
+
+.canvas-grid-subline {
+  stroke: var(--grid-line-color);
+  stroke-width: 1px;
+}
+
+/* --------------------------------------------------------------------------
+   Shape Elements (Entity, Relationship, Attribute)
+   -------------------------------------------------------------------------- */
+.diagram-node {
+  cursor: grab;
+  transition: filter var(--transition-fast);
+}
+
+.diagram-node:active {
+  cursor: grabbing;
+}
+
+.diagram-node text {
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  text-anchor: middle;
+  dominant-baseline: central;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Entity Shape */
+.shape-entity {
+  fill: var(--shape-entity-bg);
+  stroke: var(--shape-entity-stroke);
+  stroke-width: 2px;
+  rx: var(--radius-md);
+  ry: var(--radius-md);
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.15));
+  transition: stroke var(--transition-fast), fill var(--transition-fast);
+}
+
+.diagram-node.entity text {
+  font-weight: 700;
+  fill: var(--shape-entity-text);
+  font-size: var(--font-size-base);
+}
+
+/* Relationship Shape (Diamond) */
+.shape-relation {
+  fill: var(--shape-relation-bg);
+  stroke: var(--shape-relation-stroke);
+  stroke-width: 2px;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.15));
+  transition: stroke var(--transition-fast), fill var(--transition-fast);
+}
+
+.diagram-node.relation text {
+  font-weight: 600;
+  fill: var(--shape-relation-text);
+  font-size: var(--font-size-sm);
+}
+
+/* Attribute Shapes */
+.shape-attribute {
+  fill: var(--shape-attribute-bg);
+  stroke: var(--shape-attribute-stroke);
+  stroke-width: 1.75px;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.12));
+  transition: stroke var(--transition-fast), fill var(--transition-fast);
+}
+
+.diagram-node.attribute text {
+  font-weight: 500;
+  fill: var(--shape-attribute-text);
+  font-size: var(--font-size-xs);
+}
+
+/* Primary Key Attribute (PK) */
+.diagram-node.attribute-primary .shape-attribute {
+  fill: var(--shape-primary-bg);
+  stroke: var(--shape-primary-stroke);
+  stroke-width: 2.25px;
+}
+
+.diagram-node.attribute-primary text {
+  fill: var(--shape-primary-text);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* Multivalued Attribute */
+.shape-multivalued-outer {
+  fill: var(--shape-multivalued-bg);
+  stroke: var(--shape-multivalued-stroke);
+  stroke-width: 1.5px;
+}
+
+.shape-multivalued-inner {
+  fill: transparent;
+  stroke: var(--shape-multivalued-stroke);
+  stroke-width: 1.5px;
+}
+
+.diagram-node.attribute-multivalued text {
+  fill: var(--shape-multivalued-text);
+}
+
+/* Derived Attribute */
+.diagram-node.attribute-derived .shape-attribute {
+  fill: var(--shape-derived-bg);
+  stroke: var(--shape-derived-stroke);
+  stroke-width: 1.75px;
+  stroke-dasharray: 4 3;
+}
+
+.diagram-node.attribute-derived text {
+  fill: var(--shape-derived-text);
+  font-style: italic;
+}
+
+/* --------------------------------------------------------------------------
+   Connect Handles (Ports on Border Edges for Drag-to-Connect)
+   -------------------------------------------------------------------------- */
+.connect-handle {
+  fill: #3b82f6;
+  stroke: #ffffff;
+  stroke-width: 2px;
+  cursor: crosshair;
+  opacity: 0;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.diagram-node:hover .connect-handle {
+  opacity: 0.9;
+}
+
+.connect-handle:hover {
+  opacity: 1 !important;
+  fill: #60a5fa !important;
+  stroke: #ffffff !important;
+  stroke-width: 2.5px !important;
+  filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.9));
+}
+
+/* --------------------------------------------------------------------------
+   Selection & Focus Effects (Subtle Glow)
+   -------------------------------------------------------------------------- */
+.diagram-node.selected .shape-entity,
+.diagram-node.selected .shape-relation,
+.diagram-node.selected .shape-attribute,
+.diagram-node.selected .shape-multivalued-outer {
+  stroke-width: 2.5px !important;
+  stroke: var(--border-focus) !important;
+  filter: var(--selection-shadow) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Connection Lines & Hitboxes
+   -------------------------------------------------------------------------- */
+.connection-group {
+  cursor: pointer;
+}
+
+.connection-hitbox {
+  stroke: transparent;
+  stroke-width: 18px;
+  fill: none;
+  cursor: pointer;
+  pointer-events: stroke;
+}
+
+.connection-line {
+  stroke: var(--line-stroke);
+  stroke-width: 2px;
+  fill: none;
+  stroke-linecap: round;
+  pointer-events: none;
+  transition: stroke var(--transition-fast), stroke-width var(--transition-fast);
+}
+
+.connection-group:hover .connection-line {
+  stroke: var(--color-primary);
+  stroke-width: 2.5px;
+}
+
+.connection-line.selected,
+.connection-group.selected .connection-line {
+  stroke: var(--color-primary) !important;
+  stroke-width: 3px !important;
+  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.8)) !important;
+}
+
+.connection-line.identifying {
+  stroke-dasharray: 5 4;
+}
+
+/* Cardinality Label Group */
+.cardinality-group {
+  cursor: pointer;
+}
+
+.cardinality-pill {
+  fill: var(--cardinality-bg);
+  stroke: var(--border-subtle);
+  stroke-width: 1px;
+  rx: 4px;
+  ry: 4px;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.25));
+}
+
+.cardinality-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  fill: var(--cardinality-text);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.connection-group.selected .cardinality-pill {
+  stroke: var(--color-primary);
+  stroke-width: 1.5px;
+}
+
+/* --------------------------------------------------------------------------
+   Canvas Floating Controls (Zoom, Pan, Reset)
+   -------------------------------------------------------------------------- */
+.canvas-controls {
+  position: absolute;
+  bottom: 1.25rem;
+  left: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background-color: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow);
+  z-index: var(--z-overlay);
+}
+
+.zoom-label {
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-muted);
+  min-width: 45px;
+  text-align: center;
+}
+
+/* --------------------------------------------------------------------------
+   Minimap Floating Container
+   -------------------------------------------------------------------------- */
+.canvas-minimap-container {
+  position: absolute;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  background-color: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--glass-shadow);
+  z-index: var(--z-overlay);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.minimap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.6rem;
+  background-color: var(--bg-surface-elevated);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.btn-minimap-toggle {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.minimap-canvas-wrapper {
+  position: relative;
+  width: 180px;
+  height: 120px;
+  background-color: var(--bg-canvas);
+  cursor: crosshair;
+}
+
+.minimap-viewport-box {
+  position: absolute;
+  border: 1.5px solid var(--color-primary);
+  background-color: rgba(59, 130, 246, 0.15);
+  pointer-events: none;
+  border-radius: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   Logical Relational Editor Viewport (Tab 2)
+   -------------------------------------------------------------------------- */
+.logical-viewport {
+  flex: 1;
+  height: 100%;
+  position: relative;
+  overflow-y: auto;
+  padding: 1.5rem;
+  background-color: var(--bg-canvas);
+  display: none;
+}
+
+.logical-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.logical-tables-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.logical-table-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.logical-table-header {
+  background-color: var(--bg-surface-elevated);
+  padding: 0.6rem 0.875rem;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.table-name-input {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-main);
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  padding: 0.15rem 0.35rem;
+  border-radius: var(--radius-sm);
+  outline: none;
+  width: 100%;
+}
+.table-name-input:focus {
+  background-color: var(--bg-surface);
+  border-color: var(--border-focus);
+}
+
+.logical-columns-container {
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem 0;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.logical-col-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.logical-col-item:last-child {
+  border-bottom: none;
+}
+
+.btn-toggle-pk {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0.15rem 0.35rem;
+  border-radius: 3px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-surface-elevated);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.btn-toggle-pk.active {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+/* FK Information Tooltip Badge */
+.fk-info-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background-color: rgba(139, 92, 246, 0.25);
+  color: #a78bfa;
+  font-size: 10px;
+  font-weight: bold;
+  cursor: help;
+  position: relative;
+}
+.fk-info-badge:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #0f172a;
+  color: #f8fafc;
+  padding: 0.35rem 0.6rem;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  border: 1px solid #334155;
+  z-index: 100;
+}
+
+.col-name-input {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-main);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  padding: 0.15rem 0.25rem;
+  border-radius: 3px;
+  outline: none;
+  width: 100%;
+}
+.col-name-input:focus {
+  background-color: var(--bg-surface-elevated);
+  border-color: var(--border-focus);
+}
+
+.col-type-select {
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 0.15rem 0.25rem;
+  border-radius: 3px;
+  outline: none;
+}
+
+.btn-delete-col {
+  background: none;
+  border: none;
+  color: var(--text-subtle);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0.1rem 0.25rem;
+}
+.btn-delete-col:hover {
+  color: var(--color-danger);
+}
+
+.logical-table-footer {
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+  background-color: var(--bg-surface-elevated);
+}
