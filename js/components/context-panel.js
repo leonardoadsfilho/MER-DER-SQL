@@ -17,7 +17,19 @@ class ContextPanel {
   }
 
   init() {
-    this.state.on('selection:changed', () => this.render());
+    this.state.on('selection:changed', () => {
+      this.render();
+    });
+    this.state.on('element:edit-name', ({ id } = {}) => {
+      if (!id || !this.state.selectedIds.has(id)) return;
+      window.requestAnimationFrame(() => {
+        const input = this.panel.querySelector('#input-entity-name, #input-relation-name, #input-attr-name');
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      });
+    });
     this.state.on('state:reset', () => this.render());
     this.state.on('element:removed', () => this.render());
     this.state.on('connection:removed', () => this.render());
@@ -57,6 +69,31 @@ class ContextPanel {
     } else {
       this.renderMultiSelectPanel(selectedNodes, selectedConns);
     }
+
+  }
+
+  setNameEditing(elementId, editing) {
+    document.querySelectorAll('.name-edit-caret').forEach(caret => caret.remove());
+    if (!editing || !elementId) return;
+
+    const node = Array.from(document.querySelectorAll('.diagram-node'))
+      .find(item => item.getAttribute('data-id') === elementId);
+    const text = node && node.querySelector('text');
+    if (!node || !text) return;
+
+    const textX = parseFloat(text.getAttribute('x')) || 0;
+    const textY = parseFloat(text.getAttribute('y')) || 0;
+    const textWidth = typeof text.getComputedTextLength === 'function'
+      ? text.getComputedTextLength()
+      : 0;
+    const caret = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    const caretX = textX + (textWidth / 2) + 3;
+    caret.setAttribute('x1', caretX);
+    caret.setAttribute('x2', caretX);
+    caret.setAttribute('y1', textY - 9);
+    caret.setAttribute('y2', textY + 9);
+    caret.setAttribute('class', 'name-edit-caret');
+    node.appendChild(caret);
   }
 
   // ------------------------------------------------------------------------
@@ -175,9 +212,13 @@ class ContextPanel {
     const titleText = this.panel.querySelector('.panel-title-text');
 
     if (inputName) {
-      inputName.addEventListener('focus', () => { this.isTyping = true; });
+      inputName.addEventListener('focus', () => {
+        this.isTyping = true;
+        this.setNameEditing(entity.id, true);
+      });
       inputName.addEventListener('blur', () => { 
-        this.isTyping = false; 
+        this.isTyping = false;
+        this.setNameEditing(entity.id, false);
         this.state.pushSnapshot();
       });
       inputName.addEventListener('input', (e) => {
@@ -185,6 +226,7 @@ class ContextPanel {
         if (titleText) titleText.textContent = val;
         this.state.updateElement(entity.id, { name: val }, false, false);
         this.state.emit('change', { type: 'element:name_live', id: entity.id });
+        this.setNameEditing(entity.id, true);
       });
     }
 
@@ -391,9 +433,13 @@ class ContextPanel {
     const titleText = this.panel.querySelector('.panel-title-text');
 
     if (inputName) {
-      inputName.addEventListener('focus', () => { this.isTyping = true; });
+      inputName.addEventListener('focus', () => {
+        this.isTyping = true;
+        this.setNameEditing(relation.id, true);
+      });
       inputName.addEventListener('blur', () => { 
-        this.isTyping = false; 
+        this.isTyping = false;
+        this.setNameEditing(relation.id, false);
         this.state.pushSnapshot();
       });
       inputName.addEventListener('input', (e) => {
@@ -401,6 +447,7 @@ class ContextPanel {
         if (titleText) titleText.textContent = val;
         this.state.updateElement(relation.id, { name: val }, false, false);
         this.state.emit('change', { type: 'element:name_live', id: relation.id });
+        this.setNameEditing(relation.id, true);
       });
     }
 
@@ -551,9 +598,13 @@ class ContextPanel {
     const titleText = this.panel.querySelector('.panel-title-text');
 
     if (inputName) {
-      inputName.addEventListener('focus', () => { this.isTyping = true; });
+      inputName.addEventListener('focus', () => {
+        this.isTyping = true;
+        this.setNameEditing(attr.id, true);
+      });
       inputName.addEventListener('blur', () => { 
-        this.isTyping = false; 
+        this.isTyping = false;
+        this.setNameEditing(attr.id, false);
         this.state.pushSnapshot();
       });
       inputName.addEventListener('input', (e) => {
@@ -561,6 +612,7 @@ class ContextPanel {
         if (titleText) titleText.textContent = val;
         this.state.updateElement(attr.id, { name: val }, false, false);
         this.state.emit('change', { type: 'element:name_live', id: attr.id });
+        this.setNameEditing(attr.id, true);
       });
     }
 

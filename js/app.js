@@ -208,61 +208,7 @@ class App {
   }
 
   loadInitialDiagram() {
-    const hasAutosave = this.storage.loadLocal();
-    if (!hasAutosave || this.state.elements.size === 0) {
-      this.createSampleTemplate();
-    }
-  }
-
-  createSampleTemplate() {
-    // 1. Cliente Entity + Attributes
-    const cliente = this.state.addElement({
-      name: 'Cliente',
-      type: 'entity',
-      x: 280,
-      y: 260
-    }, false);
-
-    this.state.addAttribute(cliente.id, { name: 'id_cliente', attrType: 'primary', x: 180, y: 160 });
-    this.state.addAttribute(cliente.id, { name: 'nome', attrType: 'simple', x: 280, y: 140 });
-    this.state.addAttribute(cliente.id, { name: 'email', attrType: 'simple', x: 380, y: 160 });
-    this.state.addAttribute(cliente.id, { name: 'telefones', attrType: 'multivalued', x: 160, y: 260 });
-
-    // 2. Pedido Entity + Attributes
-    const pedido = this.state.addElement({
-      name: 'Pedido',
-      type: 'entity',
-      x: 740,
-      y: 260
-    }, false);
-
-    this.state.addAttribute(pedido.id, { name: 'id_pedido', attrType: 'primary', x: 740, y: 140 });
-    this.state.addAttribute(pedido.id, { name: 'data_pedido', attrType: 'simple', x: 860, y: 160 });
-    this.state.addAttribute(pedido.id, { name: 'valor_total', attrType: 'simple', x: 860, y: 260 });
-
-    // 3. Faz Relationship (1:N)
-    const relFaz = this.state.addElement({
-      name: 'Realiza',
-      type: 'relation',
-      x: 510,
-      y: 260
-    }, false);
-
-    this.state.addConnection({
-      fromId: cliente.id,
-      toId: relFaz.id,
-      type: 'relationship',
-      cardinalityTo: '1'
-    }, false);
-
-    this.state.addConnection({
-      fromId: relFaz.id,
-      toId: pedido.id,
-      type: 'relationship',
-      cardinalityTo: 'N'
-    }, false);
-
-    this.state.select(cliente.id);
+    this.storage.loadLocal();
   }
 }
 

@@ -10,6 +10,8 @@ class DiagramState {
     this.selectedIds = new Set();      // Selected Node IDs
     this.selectedConnectionIds = new Set(); // Selected Connection IDs
     this.viewport = { x: 0, y: 0, zoom: 1 };
+    this.logicalLayout = {};
+    this.logicalColumnOverrides = {};
     
     // Undo / Redo Stacks
     this.history = [];
@@ -372,7 +374,9 @@ class DiagramState {
       timestamp: new Date().toISOString(),
       elements: Array.from(this.elements.values()),
       connections: this.connections,
-      viewport: this.viewport
+      viewport: this.viewport,
+      logicalLayout: this.logicalLayout,
+      logicalColumnOverrides: this.logicalColumnOverrides
     }, null, 2);
   }
 
@@ -399,6 +403,12 @@ class DiagramState {
       if (data.viewport) {
         this.viewport = data.viewport;
       }
+      this.logicalLayout = data.logicalLayout && typeof data.logicalLayout === 'object'
+        ? data.logicalLayout
+        : {};
+      this.logicalColumnOverrides = data.logicalColumnOverrides && typeof data.logicalColumnOverrides === 'object'
+        ? data.logicalColumnOverrides
+        : {};
 
       this.emit('state:reset');
       this.emit('change', { type: 'state:reset' });
@@ -415,8 +425,36 @@ class DiagramState {
     this.connections = [];
     this.selectedIds.clear();
     this.selectedConnectionIds.clear();
+    this.logicalLayout = {};
+    this.logicalColumnOverrides = {};
     this.emit('state:reset');
     this.emit('change', { type: 'state:cleared' });
+  }
+
+  updateLogicalPosition(tableKey, position) {
+    if (!tableKey) return;
+    this.logicalLayout[tableKey] = {
+      x: Math.round(position.x || 0),
+      y: Math.round(position.y || 0)
+    };
+    this.emit('change', { type: 'logical:position', tableKey });
+  }
+
+  updateLogicalColumn(tableKey, columnName, changes) {
+    if (!tableKey || !columnName) return;
+    const key = `${tableKey}::${columnName}`;
+    this.logicalColumnOverrides[key] = {
+      ...(this.logicalColumnOverrides[key] || {}),
+      ...changes
+    };
+    this.emit('change', { type: 'logical:column', tableKey, columnName });
+  }
+
+  removeLogicalColumnOverride(tableKey, columnName) {
+    const key = `${tableKey}::${columnName}`;
+    if (!Object.prototype.hasOwnProperty.call(this.logicalColumnOverrides, key)) return;
+    delete this.logicalColumnOverrides[key];
+    this.emit('change', { type: 'logical:column-override-removed', tableKey, columnName });
   }
 }
 

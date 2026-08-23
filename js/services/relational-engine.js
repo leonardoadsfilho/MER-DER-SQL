@@ -26,7 +26,7 @@ class RelationalEngine {
             hasPk = true;
             columns.push({
               name: colName,
-              type: 'INT',
+              type: attr.sqlType || 'INT',
               isPk: true,
               isFk: false,
               isNullable: false,
@@ -53,7 +53,7 @@ class RelationalEngine {
                 const subColName = this.sanitizeIdentifier(sub.name);
                 columns.push({
                   name: `${colName}_${subColName}`,
-                  type: this.guessDataType(subColName),
+                  type: sub.sqlType || this.guessDataType(subColName),
                   isPk: false,
                   isFk: false,
                   isNullable: true
@@ -62,7 +62,7 @@ class RelationalEngine {
             } else {
               columns.push({
                 name: colName,
-                type: 'VARCHAR(255)',
+                type: attr.sqlType || 'VARCHAR(255)',
                 isPk: false,
                 isFk: false,
                 isNullable: true
@@ -71,7 +71,7 @@ class RelationalEngine {
           } else if (attrType !== 'derived') {
             columns.push({
               name: colName,
-              type: this.guessDataType(colName),
+              type: attr.sqlType || this.guessDataType(colName),
               isPk: false,
               isFk: false,
               isNullable: true
@@ -79,9 +79,11 @@ class RelationalEngine {
           }
         });
 
-        if (!hasPk) {
+        const implicitPkName = `id_${tableName.toLowerCase()}`;
+        const alreadyHasImplicitColumn = columns.some(column => column.name === implicitPkName);
+        if (!hasPk && !el.suppressImplicitPk && !alreadyHasImplicitColumn) {
           columns.unshift({
-            name: `id_${tableName.toLowerCase()}`,
+            name: implicitPkName,
             type: 'INT',
             isPk: true,
             isFk: false,
@@ -214,7 +216,21 @@ class RelationalEngine {
       }
     });
 
-    return Array.from(tablesMap.values());
+    const tables = Array.from(tablesMap.values());
+
+    // DER-only property changes belong to the shared state too. This keeps a
+    // generated FK/implicit PK as the same column instead of creating an
+    // attribute with a duplicate name merely to persist the edit.
+    tables.forEach(table => {
+      const tableKey = table.id || table.name;
+      table.columns.forEach(column => {
+        const override = state.logicalColumnOverrides &&
+          state.logicalColumnOverrides[`${tableKey}::${column.name}`];
+        if (override) Object.assign(column, override);
+      });
+    });
+
+    return tables;
   }
 
   isManyCardinality(card) {

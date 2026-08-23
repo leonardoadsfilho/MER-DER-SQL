@@ -42,6 +42,18 @@
   pointer-events: none;
 }
 
+.name-edit-caret {
+  stroke: var(--text-main);
+  stroke-width: 1.5px;
+  pointer-events: none;
+  animation: name-caret-blink 1s steps(1, end) infinite;
+}
+
+@keyframes name-caret-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
 /* Entity Shape */
 .shape-entity {
   fill: var(--shape-entity-bg);
@@ -349,6 +361,27 @@
   align-items: start;
 }
 
+.logical-diagram {
+  position: relative;
+  min-height: calc(100% - 70px);
+}
+
+.logical-fk-layer {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.logical-fk-line {
+  stroke: var(--color-accent);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  fill: none;
+  pointer-events: none;
+}
+
 .logical-table-card {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-subtle);
@@ -357,6 +390,13 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 2;
+}
+
+.logical-table-card.dragging {
+  z-index: 3;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
 }
 
 .logical-table-header {
@@ -367,6 +407,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  cursor: move;
 }
 
 .table-name-input {
@@ -402,6 +443,19 @@
 }
 .logical-col-item:last-child {
   border-bottom: none;
+}
+
+.logical-col-item.selected {
+  background-color: var(--color-primary-subtle);
+  outline: 1px solid var(--border-focus);
+  outline-offset: -1px;
+}
+
+.btn-toggle-fk {
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  line-height: 1;
 }
 
 .btn-toggle-pk {

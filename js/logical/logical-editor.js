@@ -17,19 +17,61 @@ class LogicalEditor {
     this.tables = [];
     this.selectedTableIndex = null;
     this.userEditedRelName = false;
+    this.selectedColumn = null;
+    this.dragState = null;
 
     this.init();
   }
 
   init() {
-    this.state.on('change', () => this.syncFromState());
-    this.state.on('state:reset', () => this.syncFromState());
+    this.state.on('change', (change) => {
+      if (change && change.type === 'logical:position') {
+        this.renderForeignKeyLinks();
+        return;
+      }
+      this.syncFromState();
+    });
     this.syncFromState();
+    if (this.container) {
+      this.container.addEventListener('scroll', () => this.renderForeignKeyLinks(), { passive: true });
+    }
   }
 
   syncFromState() {
+    if (this.migrateLegacyForeignKeyOverrides()) return;
     this.tables = this.relational.generateRelationalSchema(this.state);
     this.render();
+  }
+
+  migrateLegacyForeignKeyOverrides() {
+    if (this._migratingLegacyFk || !this.state.logicalColumnOverrides) return false;
+
+    for (const [key, override] of Object.entries(this.state.logicalColumnOverrides)) {
+      if (!override || override.isFk !== false) continue;
+      const separator = key.indexOf('::');
+      if (separator < 0) continue;
+      const tableKey = key.slice(0, separator);
+      const columnName = key.slice(separator + 2);
+      if (!this.state.elements.has(tableKey)) continue;
+
+      delete this.state.logicalColumnOverrides[key];
+      const originalTables = this.relational.generateRelationalSchema(this.state);
+      this.state.logicalColumnOverrides[key] = override;
+      const table = originalTables.find(item => (item.id || item.name) === tableKey);
+      const column = table && table.columns.find(item => item.name === columnName && item.isFk);
+      if (!table || !column) continue;
+
+      this._migratingLegacyFk = true;
+      try {
+        this.convertForeignKeyToColumn(table, column);
+      } finally {
+        this._migratingLegacyFk = false;
+      }
+      this.tables = this.relational.generateRelationalSchema(this.state);
+      this.render();
+      return true;
+    }
+    return false;
   }
 
   render() {
@@ -68,14 +110,15 @@ class LogicalEditor {
           <button id="btn-add-table-top" class="btn btn-primary btn-sm">+ Tabela</button>
           <button id="btn-create-rel-top" class="btn btn-accent btn-sm">+ Relacionamento</button>
           <button id="btn-export-der-png" class="btn btn-secondary btn-sm" title="Exportar PNG do Modelo Lógico (P&B)">📷 PNG (DER)</button>
-          <button id="btn-sync-mer" class="btn btn-secondary btn-sm" title="Sincronizar com o Diagrama MER">🔄 Sincronizar</button>
           <button id="btn-clear-der" class="btn btn-danger btn-sm" title="Excluir todas as tabelas e relacionamentos">🗑 Excluir Tudo</button>
         </div>
       </div>
 
+      <div class="logical-diagram">
+      <svg class="logical-fk-layer" aria-hidden="true"></svg>
       <div class="logical-tables-grid">
         ${this.tables.map((table, tIndex) => `
-          <div class="logical-table-card" data-table-idx="${tIndex}">
+          <div class="logical-table-card" data-table-idx="${tIndex}" data-table-key="${table.id || table.name}" style="transform: translate(${(this.state.logicalLayout[table.id || table.name] || {}).x || 0}px, ${(this.state.logicalLayout[table.id || table.name] || {}).y || 0}px)">
             <div class="logical-table-header">
               <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1;">
                 <span style="font-size: 16px;">📁</span>
@@ -89,13 +132,13 @@ class LogicalEditor {
 
             <div class="logical-columns-container">
               ${table.columns.map((col, cIndex) => `
-                <div class="logical-col-item">
+                <div class="logical-col-item ${this.selectedColumn && this.selectedColumn.tableKey === (table.id || table.name) && this.selectedColumn.columnName === col.name ? 'selected' : ''}" data-table-idx="${tIndex}" data-col-idx="${cIndex}" data-column-name="${col.name}">
                   <div style="display: flex; align-items: center; gap: 0.35rem; flex: 1;">
                     <button class="btn-toggle-pk ${col.isPk ? 'active' : ''}" data-table-idx="${tIndex}" data-col-idx="${cIndex}" title="Alternar PK / COL">
                       ${col.isPk ? 'PK' : 'COL'}
                     </button>
                     ${col.isFk ? `
-                      <span class="badge badge-fk" style="font-size: 9px;">FK</span>
+                      <button type="button" class="badge badge-fk btn-toggle-fk" data-table-idx="${tIndex}" data-col-idx="${cIndex}" title="Converter FK em coluna normal">FK</button>
                       <span class="fk-info-badge" data-tooltip="Referência: ${col.refTable || '?'}(${col.refColumn || '?'})" title="Referência: ${col.refTable || '?'}(${col.refColumn || '?'})">ℹ</span>
                     ` : ''}
                     <input type="text" class="col-name-input" value="${col.name}" data-table-idx="${tIndex}" data-col-idx="${cIndex}" />
@@ -122,7 +165,7 @@ class LogicalEditor {
             </div>
           </div>
         `).join('')}
-      </div>
+      </div></div>
 
       <!-- DER Relationship Modal -->
       <div id="modal-der-rel" class="modal-backdrop">
@@ -174,6 +217,7 @@ class LogicalEditor {
     `;
 
     this.bindEvents();
+    window.requestAnimationFrame(() => this.renderForeignKeyLinks());
   }
 
   bindEvents() {
@@ -194,14 +238,6 @@ class LogicalEditor {
         } catch (err) {
           this.modals.showToast('Erro ao exportar PNG: ' + err.message, 'error');
         }
-      });
-    }
-
-    const btnSync = this.container.querySelector('#btn-sync-mer');
-    if (btnSync) {
-      btnSync.addEventListener('click', () => {
-        this.syncFromState();
-        this.modals.showToast('Modelo sincronizado com o MER!', 'success');
       });
     }
 
@@ -288,7 +324,6 @@ class LogicalEditor {
           this.state.removeElement(table.id);
         } else {
           this.tables.splice(tIdx, 1);
-          this.render();
         }
       });
     });
@@ -321,12 +356,12 @@ class LogicalEditor {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        const tIdx = parseInt(e.target.dataset.tableIdx, 10);
-        const cIdx = parseInt(e.target.dataset.colIdx, 10);
+        const trigger = e.currentTarget.closest('.btn-toggle-pk');
+        const tIdx = parseInt(trigger.dataset.tableIdx, 10);
+        const cIdx = parseInt(trigger.dataset.colIdx, 10);
         const table = this.tables[tIdx];
         if (table && table.columns[cIdx]) {
           const col = table.columns[cIdx];
-          const wasPk = col.isPk;
           col.isPk = !col.isPk;
 
           if (table.id) {
@@ -336,17 +371,34 @@ class LogicalEditor {
               a.name.replace(/^\*/, '').toLowerCase() === col.name.toLowerCase()
             );
             if (matchedAttr) {
+              this.state.updateElement(table.id, {
+                suppressImplicitPk: !col.isPk
+              }, false, false);
               this.state.updateElement(matchedAttr.id, { attrType: col.isPk ? 'primary' : 'simple' });
+            } else {
+              this.state.updateLogicalColumn(table.id, col.name, { isPk: col.isPk });
             }
+          } else {
+            this.state.updateLogicalColumn(table.name, col.name, { isPk: col.isPk });
           }
-
-          // If demoting PK -> COL, cascade: remove FK references in other tables
-          if (wasPk && !col.isPk) {
-            this.handlePkDemotion(table.name, col.name);
-          }
-
-          this.render();
         }
+      });
+    });
+
+    // Convert a generated FK into a real, regular MER attribute. Merely
+    // hiding isFk would leave a DER-only "ghost" column.
+    this.container.querySelectorAll('.btn-toggle-fk').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const trigger = e.currentTarget.closest('.btn-toggle-fk');
+        const tIdx = parseInt(trigger.dataset.tableIdx, 10);
+        const cIdx = parseInt(trigger.dataset.colIdx, 10);
+        const table = this.tables[tIdx];
+        const col = table && table.columns[cIdx];
+        if (!table || !col) return;
+        this.selectedColumn = { tableKey: table.id || table.name, columnName: col.name };
+        this.convertForeignKeyToColumn(table, col);
       });
     });
 
@@ -378,6 +430,16 @@ class LogicalEditor {
         const cIdx = parseInt(e.target.dataset.colIdx, 10);
         if (this.tables[tIdx] && this.tables[tIdx].columns[cIdx]) {
           this.tables[tIdx].columns[cIdx].type = e.target.value;
+          const table = this.tables[tIdx];
+          if (table.id) {
+            const column = table.columns[cIdx];
+            const attr = this.state.getAttributesFor(table.id).find(item =>
+              this.relational.sanitizeIdentifier(item.name) === column.name
+            );
+            if (attr) this.state.updateElement(attr.id, { sqlType: e.target.value });
+          } else {
+            this.state.emit('change', { type: 'logical:column-type' });
+          }
         }
       });
     });
@@ -402,7 +464,15 @@ class LogicalEditor {
             const attrs = this.state.getAttributesFor(table.id);
             const matchedAttr = attrs.find(a => a.name === col.name || a.name.replace(/^\*/, '') === col.name);
             if (matchedAttr) {
+              if (col.isPk) {
+                this.state.updateElement(table.id, { suppressImplicitPk: true }, false, false);
+              }
               this.state.removeElement(matchedAttr.id);
+            } else if (col.isPk) {
+              // An implicit PK has no MER attribute to remove. Suppress its
+              // regeneration and clear any DER override for this column.
+              this.state.updateElement(table.id, { suppressImplicitPk: true });
+              this.state.removeLogicalColumnOverride(table.id, col.name);
             }
           } else {
             table.columns.splice(cIdx, 1);
@@ -411,6 +481,167 @@ class LogicalEditor {
         }
       });
     });
+
+    this.container.querySelectorAll('.logical-col-item').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.btn-delete-col')) return;
+        const tIdx = parseInt(row.dataset.tableIdx, 10);
+        const cIdx = parseInt(row.dataset.colIdx, 10);
+        const table = this.tables[tIdx];
+        const column = table && table.columns[cIdx];
+        if (!table || !column) return;
+        this.selectedColumn = { tableKey: table.id || table.name, columnName: column.name };
+        this.container.querySelectorAll('.logical-col-item.selected').forEach(item => item.classList.remove('selected'));
+        row.classList.add('selected');
+        const input = row.querySelector('.col-name-input');
+        if (input && e.target !== input && !e.target.closest('button, select')) input.focus();
+      });
+    });
+
+    this.bindTableDragging();
+  }
+
+  convertForeignKeyToColumn(table, column) {
+    // Associative tables do not have a single owning MER entity. Keep their
+    // edit as a DER override, without changing the PK flag.
+    if (!table.id) {
+      this.state.updateLogicalColumn(table.name, column.name, {
+        isFk: false,
+        refTable: null,
+        refColumn: null
+      });
+      return;
+    }
+
+    const owner = this.state.elements.get(table.id);
+    if (!owner || owner.type !== 'entity') return;
+
+    this.state.pushSnapshot();
+
+    // Remove only relationships that produce this FK in this owner table.
+    const producingRelations = Array.from(this.state.elements.values()).filter(element =>
+      element.type === 'relation' && this.relationshipProducesForeignKey(element, owner, column)
+    );
+    producingRelations.forEach(relation => this.state.removeElement(relation.id, false));
+
+    const existingAttribute = this.state.getAttributesFor(owner.id).find(attribute =>
+      this.relational.sanitizeIdentifier(attribute.name) === column.name
+    );
+
+    if (existingAttribute) {
+      this.state.updateElement(existingAttribute.id, {
+        attrType: column.isPk ? 'primary' : 'simple',
+        sqlType: column.type
+      }, false);
+    } else {
+      this.state.addAttribute(owner.id, {
+        name: column.name,
+        attrType: column.isPk ? 'primary' : 'simple',
+        sqlType: column.type
+      });
+    }
+
+    this.state.removeLogicalColumnOverride(owner.id, column.name);
+  }
+
+  relationshipProducesForeignKey(relation, owner, column) {
+    const endpoints = this.state.connections
+      .filter(connection =>
+        connection.type !== 'attribute_link' &&
+        (connection.fromId === relation.id || connection.toId === relation.id)
+      )
+      .map(connection => ({
+        entity: this.state.elements.get(
+          connection.fromId === relation.id ? connection.toId : connection.fromId
+        ),
+        cardinality: connection.cardinalityTo || 'N'
+      }))
+      .filter(endpoint => endpoint.entity && endpoint.entity.type === 'entity');
+
+    if (endpoints.length !== 2) return false;
+    const [a, b] = endpoints;
+    const manyA = this.relational.isManyCardinality(a.cardinality);
+    const manyB = this.relational.isManyCardinality(b.cardinality);
+    let fkOwner = null;
+    let referenced = null;
+
+    if (!manyA && manyB) {
+      fkOwner = b.entity;
+      referenced = a.entity;
+    } else if (manyA && !manyB) {
+      fkOwner = a.entity;
+      referenced = b.entity;
+    } else if (!manyA && !manyB) {
+      fkOwner = b.entity;
+      referenced = a.entity;
+    }
+
+    return fkOwner && fkOwner.id === owner.id &&
+      this.relational.sanitizeIdentifier(referenced.name) === column.refTable;
+  }
+
+  bindTableDragging() {
+    this.container.querySelectorAll('.logical-table-header').forEach(header => {
+      header.addEventListener('mousedown', (e) => {
+        if (e.button !== 0 || e.target.closest('input, button')) return;
+        const card = header.closest('.logical-table-card');
+        const key = card.dataset.tableKey;
+        const start = this.state.logicalLayout[key] || { x: 0, y: 0 };
+        this.dragState = { card, key, startX: e.clientX, startY: e.clientY, x: start.x, y: start.y };
+        card.classList.add('dragging');
+        e.preventDefault();
+      });
+    });
+
+    if (!this._dragListenersBound) {
+      window.addEventListener('mousemove', (e) => {
+        if (!this.dragState) return;
+        const x = this.dragState.x + e.clientX - this.dragState.startX;
+        const y = this.dragState.y + e.clientY - this.dragState.startY;
+        this.dragState.card.style.transform = `translate(${x}px, ${y}px)`;
+        this.renderForeignKeyLinks();
+      });
+      window.addEventListener('mouseup', (e) => {
+        if (!this.dragState) return;
+        const drag = this.dragState;
+        this.dragState = null;
+        drag.card.classList.remove('dragging');
+        this.state.updateLogicalPosition(drag.key, {
+          x: drag.x + e.clientX - drag.startX,
+          y: drag.y + e.clientY - drag.startY
+        });
+      });
+      window.addEventListener('resize', () => this.renderForeignKeyLinks());
+      this._dragListenersBound = true;
+    }
+  }
+
+  renderForeignKeyLinks() {
+    const svg = this.container && this.container.querySelector('.logical-fk-layer');
+    const diagram = this.container && this.container.querySelector('.logical-diagram');
+    if (!svg || !diagram) return;
+    const origin = diagram.getBoundingClientRect();
+    svg.setAttribute('width', diagram.scrollWidth);
+    svg.setAttribute('height', diagram.scrollHeight);
+    const links = [];
+    this.tables.forEach((table, tableIndex) => {
+      table.columns.forEach((column, columnIndex) => {
+        if (!column.isFk || !column.refTable || !column.refColumn) return;
+        const source = this.container.querySelector(`.logical-col-item[data-table-idx="${tableIndex}"][data-col-idx="${columnIndex}"]`);
+        const targetTableIndex = this.tables.findIndex(item => item.name === column.refTable);
+        const targetColumnIndex = targetTableIndex < 0 ? -1 : this.tables[targetTableIndex].columns.findIndex(item => item.name === column.refColumn);
+        const target = targetColumnIndex < 0 ? null : this.container.querySelector(`.logical-col-item[data-table-idx="${targetTableIndex}"][data-col-idx="${targetColumnIndex}"]`);
+        if (!source || !target) return;
+        const a = source.getBoundingClientRect();
+        const b = target.getBoundingClientRect();
+        const ax = a.left + a.width / 2 - origin.left + diagram.scrollLeft;
+        const ay = a.top + a.height / 2 - origin.top + diagram.scrollTop;
+        const bx = b.left + b.width / 2 - origin.left + diagram.scrollLeft;
+        const by = b.top + b.height / 2 - origin.top + diagram.scrollTop;
+        links.push(`<line class="logical-fk-line" x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" />`);
+      });
+    });
+    svg.innerHTML = links.join('');
   }
 
   /**

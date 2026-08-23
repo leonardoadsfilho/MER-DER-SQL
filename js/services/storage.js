@@ -11,8 +11,14 @@ class StorageService {
     this.DIR_PREF_KEY = 'mer_editor_saved_dir_handle';
     this.savedDirHandle = null;
     this.alwaysUseSavedDir = false;
+    this.autosaveTimer = null;
+    this.autosaveDelay = 400;
 
     this.loadDirPreference();
+    this.unsubscribeAutosave = this.state.on('change', () => this.scheduleAutosave());
+    window.addEventListener('beforeunload', () => {
+      if (this.autosaveTimer) this.saveLocal();
+    });
   }
 
   loadDirPreference() {
@@ -120,6 +126,14 @@ class StorageService {
     } catch (e) {
       console.warn('LocalStorage save failed', e);
     }
+  }
+
+  scheduleAutosave() {
+    window.clearTimeout(this.autosaveTimer);
+    this.autosaveTimer = window.setTimeout(() => {
+      this.autosaveTimer = null;
+      this.saveLocal();
+    }, this.autosaveDelay);
   }
 
   loadLocal() {

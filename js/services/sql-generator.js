@@ -69,7 +69,7 @@ class SqlGenerator {
 
       const allDefinitions = [...columnDefs, ...foreignKeys];
       lines.push(allDefinitions.join(',\n'));
-      lines.push(') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\n');
+      lines.push(');\n');
     });
 
     return lines.join('\n');

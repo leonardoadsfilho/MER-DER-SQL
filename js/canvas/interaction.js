@@ -17,6 +17,7 @@ class CanvasInteraction {
 
     this.draggedElementId = null;
     this.dragStartPos = { x: 0, y: 0 };
+    this.pointerMoved = false;
     this.initialPositions = new Map();
     this.panStartPos = { x: 0, y: 0 };
     this.spacePressed = false;
@@ -93,14 +94,13 @@ class CanvasInteraction {
       if (isMultiKey) {
         this.state.select(elementId, true);
       } else {
-        if (!this.state.selectedIds.has(elementId)) {
-          this.state.select(elementId, false);
-        }
+        this.state.select(elementId, false);
       }
 
       this.isDragging = true;
       this.draggedElementId = elementId;
       this.dragStartPos = this.getCanvasCoordinates(e);
+      this.pointerMoved = false;
 
       this.initialPositions.clear();
       const draggedElementsToMove = new Set(this.state.selectedIds);
@@ -173,6 +173,7 @@ class CanvasInteraction {
     const currentPos = this.getCanvasCoordinates(e);
     const dx = currentPos.x - this.dragStartPos.x;
     const dy = currentPos.y - this.dragStartPos.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.pointerMoved = true;
 
     this.initialPositions.forEach((initialPos, id) => {
       const el = this.state.elements.get(id);
@@ -196,10 +197,15 @@ class CanvasInteraction {
     }
 
     if (this.isDragging) {
+      const clickedElementId = this.draggedElementId;
+      const shouldEditName = !this.pointerMoved;
       this.isDragging = false;
       this.draggedElementId = null;
       this.initialPositions.clear();
       this.state.pushSnapshot();
+      if (shouldEditName && clickedElementId) {
+        this.state.emit('element:edit-name', { id: clickedElementId });
+      }
     }
   }
 
