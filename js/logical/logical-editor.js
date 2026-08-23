@@ -27,6 +27,11 @@ class LogicalEditor {
     this.state.on('change', (change) => {
       if (change && change.type === 'logical:position') {
         this.renderForeignKeyLinks();
+        this.renderDerMinimap();
+        return;
+      }
+      if (change && change.type === 'logical:viewport') {
+        this.applyViewportTransform();
         return;
       }
       this.syncFromState();
@@ -35,12 +40,26 @@ class LogicalEditor {
     if (this.container) {
       this.container.addEventListener('scroll', () => this.renderForeignKeyLinks(), { passive: true });
     }
+    window.addEventListener('resize', () => this.refreshViewport());
   }
 
   syncFromState() {
     if (this.migrateLegacyForeignKeyOverrides()) return;
     this.tables = this.relational.generateRelationalSchema(this.state);
+    this.ensureTablePositions();
     this.render();
+  }
+
+  ensureTablePositions() {
+    this.tables.forEach((table, index) => {
+      const key = table.id || table.name;
+      if (!this.state.logicalLayout[key]) {
+        this.state.logicalLayout[key] = {
+          x: 80 + (index % 4) * 360,
+          y: 80 + Math.floor(index / 4) * 360
+        };
+      }
+    });
   }
 
   migrateLegacyForeignKeyOverrides() {
@@ -79,24 +98,21 @@ class LogicalEditor {
 
     if (this.tables.length === 0) {
       this.container.innerHTML = `
-        <div class="empty-state" style="margin-top: 5rem;">
+        <div class="logical-editor-header"><h2 style="font-size: var(--font-size-lg);">Esquema Lógico Relacional (DER)</h2><span class="badge badge-pk">0 Tabelas</span></div>
+        <div class="logical-canvas">
+        <div class="logical-world"><svg class="logical-fk-layer" aria-hidden="true"></svg><div class="logical-tables-layer"></div></div>
+        <div class="empty-state logical-empty-state">
           <div class="empty-state-icon">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
           </div>
           <h3 style="font-weight: 700;">Nenhuma Tabela no Modelo Lógico</h3>
-          <p style="font-size: var(--font-size-xs); max-width: 380px; text-align: center;">
-            Crie Entidades no <strong>Diagrama Conceitual</strong> ou adicione uma nova tabela relacional manualmente pelo botão abaixo.
-          </p>
-          <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-            <button id="btn-add-table-empty" class="btn btn-primary">+ Criar Nova Tabela</button>
-            <button id="btn-create-rel-empty" class="btn btn-accent">+ Novo Relacionamento</button>
-          </div>
+          <p style="font-size: var(--font-size-xs); max-width: 380px; text-align: center;">Use “+ Tabela” na barra lateral para começar.</p>
+        </div>
+        <div class="der-canvas-controls"><button class="btn btn-outline btn-icon" id="btn-der-zoom-out">−</button><span id="der-zoom-percentage">100%</span><button class="btn btn-outline btn-icon" id="btn-der-zoom-in">+</button><button class="btn btn-outline" id="btn-der-zoom-reset">Reset</button></div>
+        <div class="der-minimap"><canvas width="200" height="130"></canvas><div class="der-minimap-viewport"></div></div>
         </div>
       `;
-      const btnEmpty = this.container.querySelector('#btn-add-table-empty');
-      if (btnEmpty) btnEmpty.addEventListener('click', () => this.addNewTable());
-      const btnRelEmpty = this.container.querySelector('#btn-create-rel-empty');
-      if (btnRelEmpty) btnRelEmpty.addEventListener('click', () => this.openDerRelationshipDialog());
+      this.bindTableDragging();
       return;
     }
 
@@ -106,19 +122,14 @@ class LogicalEditor {
           <h2 style="font-size: var(--font-size-lg); font-weight: 700;">Esquema Lógico Relacional (DER)</h2>
           <span class="badge badge-pk">${this.tables.length} Tabelas</span>
         </div>
-        <div style="display: flex; gap: 0.5rem;">
-          <button id="btn-add-table-top" class="btn btn-primary btn-sm">+ Tabela</button>
-          <button id="btn-create-rel-top" class="btn btn-accent btn-sm">+ Relacionamento</button>
-          <button id="btn-export-der-png" class="btn btn-secondary btn-sm" title="Exportar PNG do Modelo Lógico (P&B)">📷 PNG (DER)</button>
-          <button id="btn-clear-der" class="btn btn-danger btn-sm" title="Excluir todas as tabelas e relacionamentos">🗑 Excluir Tudo</button>
-        </div>
       </div>
 
-      <div class="logical-diagram">
+      <div class="logical-canvas">
+      <div class="logical-world">
       <svg class="logical-fk-layer" aria-hidden="true"></svg>
-      <div class="logical-tables-grid">
+      <div class="logical-tables-layer">
         ${this.tables.map((table, tIndex) => `
-          <div class="logical-table-card" data-table-idx="${tIndex}" data-table-key="${table.id || table.name}" style="transform: translate(${(this.state.logicalLayout[table.id || table.name] || {}).x || 0}px, ${(this.state.logicalLayout[table.id || table.name] || {}).y || 0}px)">
+          <div class="logical-table-card" data-table-idx="${tIndex}" data-table-key="${table.id || table.name}" style="left: ${(this.state.logicalLayout[table.id || table.name] || {}).x || 0}px; top: ${(this.state.logicalLayout[table.id || table.name] || {}).y || 0}px">
             <div class="logical-table-header">
               <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1;">
                 <span style="font-size: 16px;">📁</span>
@@ -166,6 +177,9 @@ class LogicalEditor {
           </div>
         `).join('')}
       </div></div>
+      <div class="der-canvas-controls"><button class="btn btn-outline btn-icon" id="btn-der-zoom-out">−</button><span id="der-zoom-percentage">100%</span><button class="btn btn-outline btn-icon" id="btn-der-zoom-in">+</button><button class="btn btn-outline" id="btn-der-zoom-reset">Reset</button></div>
+      <div class="der-minimap"><canvas width="200" height="130"></canvas><div class="der-minimap-viewport"></div></div>
+      </div>
 
       <!-- DER Relationship Modal -->
       <div id="modal-der-rel" class="modal-backdrop">
@@ -221,36 +235,6 @@ class LogicalEditor {
   }
 
   bindEvents() {
-    // ---- Header Buttons ----
-    const btnAddTop = this.container.querySelector('#btn-add-table-top');
-    if (btnAddTop) btnAddTop.addEventListener('click', () => this.addNewTable());
-
-    const btnCreateRelTop = this.container.querySelector('#btn-create-rel-top');
-    if (btnCreateRelTop) btnCreateRelTop.addEventListener('click', () => this.openDerRelationshipDialog());
-
-    const btnExportDer = this.container.querySelector('#btn-export-der-png');
-    if (btnExportDer) {
-      btnExportDer.addEventListener('click', async () => {
-        try {
-          this.modals.showToast('Renderizando PNG do Modelo Lógico...', 'info', 1500);
-          await this.exportPng.exportDerPNG(this.tables, 'modelo-logico-der.png');
-          this.modals.showToast('PNG do DER exportado com sucesso!', 'success');
-        } catch (err) {
-          this.modals.showToast('Erro ao exportar PNG: ' + err.message, 'error');
-        }
-      });
-    }
-
-    const btnClear = this.container.querySelector('#btn-clear-der');
-    if (btnClear) {
-      btnClear.addEventListener('click', () => {
-        if (confirm('Tem certeza que deseja excluir TODAS as tabelas e relacionamentos?')) {
-          this.state.clearAll();
-          this.modals.showToast('Modelo inteiramente limpo.', 'info');
-        }
-      });
-    }
-
     // ---- Modal DER Relationship ----
     const modalRel = this.container.querySelector('#modal-der-rel');
     const btnCloseRel = this.container.querySelector('#btn-close-der-rel');
@@ -363,6 +347,10 @@ class LogicalEditor {
         if (table && table.columns[cIdx]) {
           const col = table.columns[cIdx];
           col.isPk = !col.isPk;
+
+          if (!col.isPk) {
+            this.handlePkDemotion(table.name, col.name);
+          }
 
           if (table.id) {
             const attrs = this.state.getAttributesFor(table.id);
@@ -582,47 +570,94 @@ class LogicalEditor {
 
   bindTableDragging() {
     this.container.querySelectorAll('.logical-table-header').forEach(header => {
-      header.addEventListener('mousedown', (e) => {
+      header.addEventListener('pointerdown', (e) => {
         if (e.button !== 0 || e.target.closest('input, button')) return;
         const card = header.closest('.logical-table-card');
         const key = card.dataset.tableKey;
         const start = this.state.logicalLayout[key] || { x: 0, y: 0 };
         this.dragState = { card, key, startX: e.clientX, startY: e.clientY, x: start.x, y: start.y };
         card.classList.add('dragging');
+        header.setPointerCapture(e.pointerId);
         e.preventDefault();
       });
-    });
-
-    if (!this._dragListenersBound) {
-      window.addEventListener('mousemove', (e) => {
+      header.addEventListener('pointermove', (e) => {
         if (!this.dragState) return;
-        const x = this.dragState.x + e.clientX - this.dragState.startX;
-        const y = this.dragState.y + e.clientY - this.dragState.startY;
-        this.dragState.card.style.transform = `translate(${x}px, ${y}px)`;
+        const scale = this.state.derViewport.scale || 1;
+        const x = this.dragState.x + (e.clientX - this.dragState.startX) / scale;
+        const y = this.dragState.y + (e.clientY - this.dragState.startY) / scale;
+        this.dragState.card.style.left = `${x}px`;
+        this.dragState.card.style.top = `${y}px`;
         this.renderForeignKeyLinks();
+        this.renderDerMinimap();
       });
-      window.addEventListener('mouseup', (e) => {
+      const finishDrag = (e) => {
         if (!this.dragState) return;
         const drag = this.dragState;
+        const scale = this.state.derViewport.scale || 1;
         this.dragState = null;
         drag.card.classList.remove('dragging');
         this.state.updateLogicalPosition(drag.key, {
-          x: drag.x + e.clientX - drag.startX,
-          y: drag.y + e.clientY - drag.startY
+          x: drag.x + (e.clientX - drag.startX) / scale,
+          y: drag.y + (e.clientY - drag.startY) / scale
         });
+      };
+      header.addEventListener('pointerup', finishDrag);
+      header.addEventListener('pointercancel', finishDrag);
+    });
+
+    const canvas = this.container.querySelector('.logical-canvas');
+    if (canvas) {
+      canvas.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 || e.target.closest('.logical-table-card, button, .der-minimap')) return;
+        this.panState = { startX: e.clientX, startY: e.clientY, x: this.state.derViewport.x, y: this.state.derViewport.y };
+        canvas.setPointerCapture(e.pointerId);
+        canvas.classList.add('panning');
       });
-      window.addEventListener('resize', () => this.renderForeignKeyLinks());
-      this._dragListenersBound = true;
+      canvas.addEventListener('pointermove', (e) => {
+        if (!this.panState) return;
+        this.state.derViewport.x = this.panState.x + e.clientX - this.panState.startX;
+        this.state.derViewport.y = this.panState.y + e.clientY - this.panState.startY;
+        this.applyViewportTransform();
+      });
+      const finishPan = () => {
+        if (!this.panState) return;
+        this.panState = null;
+        canvas.classList.remove('panning');
+        this.state.updateDerViewport(this.state.derViewport);
+      };
+      canvas.addEventListener('pointerup', finishPan);
+      canvas.addEventListener('pointercancel', finishPan);
+      canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        this.zoomDer(e.deltaY < 0 ? 1.1 : 1 / 1.1, e.clientX, e.clientY);
+      }, { passive: false });
     }
+
+    this.container.querySelector('#btn-der-zoom-in')?.addEventListener('click', () => this.zoomDer(1.15));
+    this.container.querySelector('#btn-der-zoom-out')?.addEventListener('click', () => this.zoomDer(1 / 1.15));
+    this.container.querySelector('#btn-der-zoom-reset')?.addEventListener('click', () => this.resetDerViewport());
+    const minimap = this.container.querySelector('.der-minimap');
+    if (minimap) minimap.addEventListener('pointerdown', (e) => {
+      const rect = minimap.getBoundingClientRect();
+      const worldX = (e.clientX - rect.left) / rect.width * 2400;
+      const worldY = (e.clientY - rect.top) / rect.height * 1600;
+      const logicalCanvas = this.container.querySelector('.logical-canvas');
+      const scale = this.state.derViewport.scale || 1;
+      this.state.updateDerViewport({
+        x: logicalCanvas.clientWidth / 2 - worldX * scale,
+        y: logicalCanvas.clientHeight / 2 - worldY * scale
+      });
+      e.stopPropagation();
+    });
+    this.applyViewportTransform();
   }
 
   renderForeignKeyLinks() {
     const svg = this.container && this.container.querySelector('.logical-fk-layer');
-    const diagram = this.container && this.container.querySelector('.logical-diagram');
-    if (!svg || !diagram) return;
-    const origin = diagram.getBoundingClientRect();
-    svg.setAttribute('width', diagram.scrollWidth);
-    svg.setAttribute('height', diagram.scrollHeight);
+    const world = this.container && this.container.querySelector('.logical-world');
+    if (!svg || !world) return;
+    const origin = world.getBoundingClientRect();
+    const scale = this.state.derViewport.scale || 1;
     const links = [];
     this.tables.forEach((table, tableIndex) => {
       table.columns.forEach((column, columnIndex) => {
@@ -634,14 +669,113 @@ class LogicalEditor {
         if (!source || !target) return;
         const a = source.getBoundingClientRect();
         const b = target.getBoundingClientRect();
-        const ax = a.left + a.width / 2 - origin.left + diagram.scrollLeft;
-        const ay = a.top + a.height / 2 - origin.top + diagram.scrollTop;
-        const bx = b.left + b.width / 2 - origin.left + diagram.scrollLeft;
-        const by = b.top + b.height / 2 - origin.top + diagram.scrollTop;
+        const ax = (a.left + a.width / 2 - origin.left) / scale;
+        const ay = (a.top + a.height / 2 - origin.top) / scale;
+        const bx = (b.left + b.width / 2 - origin.left) / scale;
+        const by = (b.top + b.height / 2 - origin.top) / scale;
         links.push(`<line class="logical-fk-line" x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" />`);
       });
     });
     svg.innerHTML = links.join('');
+  }
+
+  zoomDer(factor, clientX, clientY) {
+    const canvas = this.container.querySelector('.logical-canvas');
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const oldScale = this.state.derViewport.scale || 1;
+    const scale = Math.max(0.25, Math.min(2.5, oldScale * factor));
+    const px = (clientX ?? (rect.left + rect.width / 2)) - rect.left;
+    const py = (clientY ?? (rect.top + rect.height / 2)) - rect.top;
+    this.state.derViewport.x = px - (px - this.state.derViewport.x) * (scale / oldScale);
+    this.state.derViewport.y = py - (py - this.state.derViewport.y) * (scale / oldScale);
+    this.state.derViewport.scale = scale;
+    this.state.updateDerViewport(this.state.derViewport);
+  }
+
+  resetDerViewport() {
+    this.state.updateDerViewport({ x: 0, y: 0, scale: 1 });
+  }
+
+  applyViewportTransform() {
+    const world = this.container && this.container.querySelector('.logical-world');
+    if (!world) return;
+    const view = this.state.derViewport;
+    world.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+    const label = this.container.querySelector('#der-zoom-percentage');
+    if (label) label.textContent = `${Math.round(view.scale * 100)}%`;
+    this.renderForeignKeyLinks();
+    this.renderDerMinimap();
+  }
+
+  refreshViewport() {
+    this.applyViewportTransform();
+  }
+
+  fitToScreen() {
+    const canvas = this.container && this.container.querySelector('.logical-canvas');
+    if (!canvas || this.tables.length === 0) return;
+    const positions = this.tables.map(table => this.state.logicalLayout[table.id || table.name]);
+    const minX = Math.min(...positions.map(pos => pos.x));
+    const minY = Math.min(...positions.map(pos => pos.y));
+    const maxX = Math.max(...positions.map(pos => pos.x + 320));
+    const maxY = Math.max(...positions.map((pos, index) => pos.y + 120 + this.tables[index].columns.length * 36));
+    const scale = Math.max(.25, Math.min(1, (canvas.clientWidth - 80) / (maxX - minX), (canvas.clientHeight - 80) / (maxY - minY)));
+    this.state.updateDerViewport({
+      scale,
+      x: (canvas.clientWidth - (maxX - minX) * scale) / 2 - minX * scale,
+      y: (canvas.clientHeight - (maxY - minY) * scale) / 2 - minY * scale
+    });
+  }
+
+  renderDerMinimap() {
+    const canvas = this.container && this.container.querySelector('.der-minimap canvas');
+    const viewport = this.container && this.container.querySelector('.der-minimap-viewport');
+    const logicalCanvas = this.container && this.container.querySelector('.logical-canvas');
+    if (!canvas || !viewport || !logicalCanvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-canvas') || '#111827';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const sx = canvas.width / 2400;
+    const sy = canvas.height / 1600;
+    ctx.save();
+    ctx.strokeStyle = '#8b5cf6';
+    ctx.setLineDash([3, 2]);
+    this.tables.forEach(table => {
+      table.columns.forEach(column => {
+        if (!column.isFk || !column.refTable) return;
+        const target = this.tables.find(item => item.name === column.refTable);
+        if (!target) return;
+        const sourcePos = this.state.logicalLayout[table.id || table.name];
+        const targetPos = this.state.logicalLayout[target.id || target.name];
+        if (!sourcePos || !targetPos) return;
+        ctx.beginPath();
+        ctx.moveTo((sourcePos.x + 150) * sx, (sourcePos.y + 60) * sy);
+        ctx.lineTo((targetPos.x + 150) * sx, (targetPos.y + 60) * sy);
+        ctx.stroke();
+      });
+    });
+    ctx.restore();
+    ctx.fillStyle = '#3b82f6';
+    this.tables.forEach(table => {
+      const pos = this.state.logicalLayout[table.id || table.name] || { x: 0, y: 0 };
+      ctx.fillRect(pos.x * sx, pos.y * sy, 300 * sx, Math.max(100, 80 + table.columns.length * 28) * sy);
+    });
+    const view = this.state.derViewport;
+    viewport.style.left = `${Math.max(0, -view.x / view.scale * sx)}px`;
+    viewport.style.top = `${Math.max(0, -view.y / view.scale * sy)}px`;
+    viewport.style.width = `${logicalCanvas.clientWidth / view.scale * sx}px`;
+    viewport.style.height = `${logicalCanvas.clientHeight / view.scale * sy}px`;
+  }
+
+  async exportCurrentPNG() {
+    try {
+      await this.exportPng.exportDerPNG(this.tables, 'modelo-logico-der.png', this.state.logicalLayout);
+      this.modals.showToast('PNG do DER exportado com sucesso!', 'success');
+    } catch (error) {
+      this.modals.showToast('Erro ao exportar PNG: ' + error.message, 'error');
+    }
   }
 
   /**
@@ -649,27 +783,54 @@ class LogicalEditor {
    * that reference this PK and remove the corresponding relationships
    */
   handlePkDemotion(tableName, pkColName) {
-    // Find connections where this table's PK was the source of an FK in another table
     const entities = Array.from(this.state.elements.values()).filter(el => el.type === 'entity');
     const sourceEntity = entities.find(el => this.relational.sanitizeIdentifier(el.name) === tableName);
-
     if (!sourceEntity) return;
 
-    // Find relations connected to this entity
-    const relConns = this.state.connections.filter(
-      c => (c.fromId === sourceEntity.id || c.toId === sourceEntity.id) && c.type !== 'attribute_link'
-    );
+    const schema = this.relational.generateRelationalSchema(this.state);
+    const references = [];
+    schema.forEach(ownerTable => {
+      ownerTable.columns.forEach(column => {
+        if (column.isFk && column.refTable === tableName && column.refColumn === pkColName) {
+          references.push({ ownerTable, column });
+        }
+      });
+    });
+    if (references.length === 0) return;
 
-    // Remove relationships connected to this entity's side
-    relConns.forEach(conn => {
-      const relId = conn.fromId === sourceEntity.id ? conn.toId : conn.fromId;
-      const relEl = this.state.elements.get(relId);
-      if (relEl && relEl.type === 'relation') {
-        this.state.removeElement(relId, false);
+    const relationsToRemove = new Set();
+    references.forEach(({ ownerTable, column }) => {
+      const owner = ownerTable.id ? this.state.elements.get(ownerTable.id) : null;
+      if (!owner) {
+        // N:N relationships generate an associative table without an entity
+        // id. Locate the relation through its two many-cardinality endpoints.
+        this.state.elements.forEach(element => {
+          if (element.type !== 'relation') return;
+          const endpoints = this.state.connections
+            .filter(connection => connection.type !== 'attribute_link' &&
+              (connection.fromId === element.id || connection.toId === element.id))
+            .map(connection => ({
+              entity: this.state.elements.get(connection.fromId === element.id ? connection.toId : connection.fromId),
+              cardinality: connection.cardinalityTo || 'N'
+            }))
+            .filter(endpoint => endpoint.entity?.type === 'entity');
+          if (endpoints.length === 2 && endpoints.every(endpoint => this.relational.isManyCardinality(endpoint.cardinality)) &&
+              endpoints.some(endpoint => endpoint.entity.id === sourceEntity.id)) {
+            relationsToRemove.add(element.id);
+          }
+        });
+        return;
       }
+      this.state.elements.forEach(element => {
+        if (element.type === 'relation' && this.relationshipProducesForeignKey(element, owner, column)) {
+          relationsToRemove.add(element.id);
+        }
+      });
     });
 
+    if (relationsToRemove.size === 0) return;
     this.state.pushSnapshot();
+    relationsToRemove.forEach(relationId => this.state.removeElement(relationId, false));
   }
 
   openDerRelationshipDialog() {

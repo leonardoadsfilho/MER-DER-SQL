@@ -28,9 +28,10 @@ class CanvasInteraction {
   }
 
   initEvents() {
-    this.svg.addEventListener('mousedown', (e) => this.onMouseDown(e));
-    window.addEventListener('mousemove', (e) => this.onMouseMove(e));
-    window.addEventListener('mouseup', (e) => this.onMouseUp(e));
+    this.svg.addEventListener('pointerdown', (e) => this.onMouseDown(e));
+    window.addEventListener('pointermove', (e) => this.onMouseMove(e));
+    window.addEventListener('pointerup', (e) => this.onMouseUp(e));
+    window.addEventListener('pointercancel', (e) => this.onMouseUp(e));
 
     this.viewport.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
 
@@ -50,10 +51,13 @@ class CanvasInteraction {
   }
 
   onMouseDown(e) {
-    if (e.button === 1 || (e.button === 0 && this.spacePressed)) {
+    const touchPan = e.pointerType !== 'mouse' &&
+      !e.target.closest('.diagram-node, [data-conn-id], .connect-handle');
+    if (e.button === 1 || (e.button === 0 && this.spacePressed) || touchPan) {
       this.isPanning = true;
       this.panStartPos = { x: e.clientX, y: e.clientY };
       this.viewport.style.cursor = 'grabbing';
+      if (this.svg.setPointerCapture && e.pointerId !== undefined) this.svg.setPointerCapture(e.pointerId);
       e.preventDefault();
       return;
     }
@@ -100,6 +104,8 @@ class CanvasInteraction {
       this.isDragging = true;
       this.draggedElementId = elementId;
       this.dragStartPos = this.getCanvasCoordinates(e);
+      this.pointerStartClient = { x: e.clientX, y: e.clientY };
+      if (this.svg.setPointerCapture && e.pointerId !== undefined) this.svg.setPointerCapture(e.pointerId);
       this.pointerMoved = false;
 
       this.initialPositions.clear();
@@ -173,7 +179,9 @@ class CanvasInteraction {
     const currentPos = this.getCanvasCoordinates(e);
     const dx = currentPos.x - this.dragStartPos.x;
     const dy = currentPos.y - this.dragStartPos.y;
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.pointerMoved = true;
+    const clientDx = e.clientX - this.pointerStartClient.x;
+    const clientDy = e.clientY - this.pointerStartClient.y;
+    if (Math.hypot(clientDx, clientDy) > 8) this.pointerMoved = true;
 
     this.initialPositions.forEach((initialPos, id) => {
       const el = this.state.elements.get(id);

@@ -42,6 +42,10 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
             Modelo Lógico (Tabelas / DER)
           </button>
+          <button class="nav-tab-btn" data-tab="sql" title="Código SQL gerado">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+            SQL
+          </button>
         </nav>
       </div>
 
@@ -66,19 +70,6 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
           Salvar JSON
         </button>
-        <button id="btn-export-png" class="btn btn-secondary btn-sm" title="Exportar imagem do diagrama em Preto e Branco Acadêmico (com * nas chaves)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-          PNG (P&B)
-        </button>
-
-        <div style="width: 1px; height: 22px; background: var(--border-subtle); margin: 0 0.25rem;"></div>
-
-        <!-- SQL Code -->
-        <button id="btn-generate-sql" class="btn btn-primary btn-sm" title="Gerar scripts SQL DDL (CREATE TABLE)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
-          Gerar SQL (DDL)
-        </button>
-
         <div style="width: 1px; height: 22px; background: var(--border-subtle); margin: 0 0.25rem;"></div>
 
         <!-- Theme Toggle -->
@@ -117,6 +108,11 @@
 
           <div class="toolbar-divider"></div>
 
+          <div class="tool-card" id="btn-side-export-mer" title="Gerar PNG do MER">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+            <span class="tool-card-label">Gerar PNG</span>
+          </div>
+
           <div class="tool-card" id="btn-clear-canvas" title="Limpar todo o diagrama">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <polyline points="3 6 5 6 21 6"></polyline>
@@ -137,12 +133,17 @@
             <span class="tool-card-label">+ Tabela</span>
           </div>
 
-          <div class="tool-card" id="btn-side-copy-sql" title="Visualizar e Copiar Código SQL DDL">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <polyline points="16 18 22 12 16 6"></polyline>
-              <polyline points="8 6 2 12 8 18"></polyline>
-            </svg>
-            <span class="tool-card-label">Ver SQL</span>
+          <div class="tool-card" id="btn-side-add-relationship" title="Adicionar relacionamento">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 3 21 12 12 21 3 12"></polygon></svg>
+            <span class="tool-card-label">Relação</span>
+          </div>
+          <div class="tool-card" id="btn-side-export-der" title="Gerar PNG do DER">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+            <span class="tool-card-label">Gerar PNG</span>
+          </div>
+          <div class="tool-card tool-card-danger" id="btn-side-clear-der" title="Excluir todas as tabelas e relacionamentos">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path></svg>
+            <span class="tool-card-label">Excluir Tudo</span>
           </div>
         </div>
       </aside>
@@ -196,6 +197,17 @@
         <!-- Rendered dynamically by js/logical/logical-editor.js -->
       </main>
 
+      <main id="sql-viewport" class="sql-viewport">
+        <div class="sql-tab-header">
+          <div><h2>SQL gerado</h2><span>Atualizado a partir do estado atual do MER/DER</span></div>
+          <div class="sql-tab-actions">
+            <button id="btn-copy-sql" class="btn btn-secondary">Copiar Código</button>
+            <button id="btn-download-sql" class="btn btn-primary">Baixar .sql</button>
+          </div>
+        </div>
+        <textarea id="sql-code-output" class="sql-tab-code" readonly spellcheck="false"></textarea>
+      </main>
+
       <!-- Right Dynamic Contextual Panel -->
       <aside id="app-context-panel" class="app-context-panel">
         <!-- Rendered dynamically by js/components/context-panel.js -->
@@ -205,38 +217,6 @@
     <!-- ======================================================================
          MODALS
          ====================================================================== -->
-
-    <!-- Modal: SQL DDL Generator -->
-    <div id="modal-sql" class="modal-backdrop">
-      <div class="modal-container modal-lg">
-        <div class="modal-header">
-          <h2 class="modal-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
-            Código SQL DDL (CREATE TABLE)
-          </h2>
-          <button class="btn btn-outline btn-sm btn-icon" data-close-modal title="Fechar">✕</button>
-        </div>
-        <div class="modal-body">
-          <div class="sql-code-container">
-            <div class="sql-code-header">
-              <span>SQL ANSI / MySQL & PostgreSQL Compatible</span>
-              <div style="display: flex; gap: 0.5rem;">
-                <button id="btn-copy-sql" class="btn btn-secondary btn-sm" style="font-size: 11px;">
-                  📋 Copiar Código
-                </button>
-                <button id="btn-download-sql" class="btn btn-primary btn-sm" style="font-size: 11px;">
-                  💾 Baixar .sql
-                </button>
-              </div>
-            </div>
-            <textarea id="sql-code-output" class="sql-code-area" readonly spellcheck="false"></textarea>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" data-close-modal>Fechar</button>
-        </div>
-      </div>
-    </div>
 
     <!-- Modal: Quick Relation Wizard -->
     <div id="modal-wizard" class="modal-backdrop">
@@ -293,6 +273,9 @@
 
     <!-- Toast Notifications Root -->
     <div id="toast-container" class="toast-container"></div>
+    <div id="orientation-overlay" class="orientation-overlay" aria-hidden="true">
+      <div class="orientation-card"><span>↻</span><h2>Gire seu dispositivo</h2><p>Para uma melhor experiência de modelagem, utilize o modo horizontal.</p></div>
+    </div>
   </div>
 
   <!-- Modular JavaScript Scripts (Compatible with file:// and http://) -->

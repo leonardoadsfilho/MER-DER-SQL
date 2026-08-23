@@ -52,6 +52,8 @@
   position: relative;
 }
 
+.tool-card-danger { color: var(--color-danger); border-color: rgba(239, 68, 68, .35); }
+
 .tool-card:hover {
   background-color: var(--bg-surface-hover);
   border-color: var(--border-strong);

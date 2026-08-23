@@ -45,9 +45,13 @@ class CanvasMinimap {
     }
 
     // Minimap drag/click events to pan the main viewport
-    this.wrapper.addEventListener('mousedown', (e) => this.onMinimapMouseDown(e));
-    window.addEventListener('mousemove', (e) => this.onMinimapMouseMove(e));
-    window.addEventListener('mouseup', () => { this.isDragging = false; });
+    this.wrapper.addEventListener('pointerdown', (e) => {
+      this.wrapper.setPointerCapture(e.pointerId);
+      this.onMinimapMouseDown(e);
+    });
+    this.wrapper.addEventListener('pointermove', (e) => this.onMinimapMouseMove(e));
+    this.wrapper.addEventListener('pointerup', () => { this.isDragging = false; });
+    this.wrapper.addEventListener('pointercancel', () => { this.isDragging = false; });
 
     // Listen to changes
     this.state.on('change', () => this.draw());

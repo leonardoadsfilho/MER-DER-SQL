@@ -30,6 +30,7 @@ html, body {
   flex-direction: column;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   position: relative;
   overflow: hidden;
 }
@@ -143,8 +144,49 @@ html, body {
   display: flex;
   flex: 1;
   height: calc(100vh - var(--header-height));
+  height: calc(100dvh - var(--header-height));
   position: relative;
   overflow: hidden;
+}
+
+.sql-viewport {
+  display: none;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: clamp(1rem, 2vw, 2rem);
+  flex-direction: column;
+  gap: 1rem;
+  background: var(--bg-canvas);
+}
+
+.sql-tab-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.sql-tab-header h2 { font-size: var(--font-size-lg); }
+.sql-tab-header span { color: var(--text-muted); font-size: var(--font-size-xs); }
+.sql-tab-actions { display: flex; gap: .5rem; }
+.sql-tab-code { flex: 1; width: 100%; min-height: 0; resize: none; padding: 1rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: #0b1020; color: #d1fae5; font: 13px/1.6 var(--font-mono); user-select: text; outline: none; }
+
+.orientation-overlay { display: none; position: fixed; inset: 0; z-index: 10000; background: var(--bg-app); align-items: center; justify-content: center; padding: 2rem; }
+.orientation-card { max-width: 360px; text-align: center; color: var(--text-main); }
+.orientation-card > span { display: block; font-size: 64px; margin-bottom: 1rem; }
+.orientation-card p { margin-top: .75rem; color: var(--text-muted); line-height: 1.6; }
+
+@media (max-width: 900px) {
+  .app-header { padding: 0 .5rem; }
+  .brand-title, .brand-version { display: none; }
+  .nav-tab-btn { padding: .4rem .55rem; font-size: 0; min-width: 42px; min-height: 42px; }
+  .nav-tab-btn svg { width: 18px; height: 18px; }
+  .header-actions .btn:not(.btn-icon) { font-size: 0; width: 42px; padding: 0; }
+  .app-context-panel { width: clamp(220px, 32vw, var(--sidebar-width)); }
+  .app-toolbar { width: 68px; }
+}
+
+@media (max-width: 700px) and (orientation: portrait) and (pointer: coarse) {
+  .touch-device .orientation-overlay { display: flex; }
+}
+
+@media (pointer: coarse) {
+  .btn, .tool-card, .nav-tab-btn { min-width: 44px; min-height: 44px; }
 }
 
 /* Main Canvas Area */

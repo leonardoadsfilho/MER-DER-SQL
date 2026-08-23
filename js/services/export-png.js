@@ -17,17 +17,38 @@ class ExportPngService {
       try {
         const svgClone = this.svg.cloneNode(true);
         const rect = this.svg.getBoundingClientRect();
-        const width = Math.max(rect.width, 1400);
-        const height = Math.max(rect.height, 900);
+        const sourceRoot = this.svg.querySelector('#canvas-root-group');
+        const cloneRoot = svgClone.querySelector('#canvas-root-group');
+        const margin = 60;
+        let bounds = null;
+        try {
+          const measured = sourceRoot && sourceRoot.getBBox();
+          if (measured && measured.width > 0 && measured.height > 0) bounds = measured;
+        } catch (error) {
+          // getBBox can fail while the SVG is detached/hidden; viewport is a
+          // safe fallback, but never influences normal populated exports.
+        }
+
+        const width = bounds ? Math.max(200, Math.ceil(bounds.width + margin * 2)) : Math.max(rect.width, 800);
+        const height = bounds ? Math.max(160, Math.ceil(bounds.height + margin * 2)) : Math.max(rect.height, 600);
 
         svgClone.setAttribute('width', width);
         svgClone.setAttribute('height', height);
+        svgClone.setAttribute('viewBox', bounds
+          ? `${bounds.x - margin} ${bounds.y - margin} ${width} ${height}`
+          : `0 0 ${width} ${height}`);
+        svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+        // Pan and zoom belong only to the editor camera. Export the world
+        // coordinates themselves so a distant minimap/viewport never crops
+        // or displaces the model.
+        if (cloneRoot) cloneRoot.removeAttribute('transform');
 
         // Remove background grid and handles from export clone
         const bgPatternRects = svgClone.querySelectorAll('rect[fill^="url(#"]');
         bgPatternRects.forEach(r => r.remove());
 
-        const handles = svgClone.querySelectorAll('.connect-handle, .connection-hitbox');
+        const handles = svgClone.querySelectorAll('.connect-handle, .connection-hitbox, .name-edit-caret');
         handles.forEach(h => h.remove());
 
         if (isBlackAndWhite) {
@@ -69,6 +90,8 @@ class ExportPngService {
           });
         }
 
+        this.prepareMerClone(svgClone);
+
         const svgString = new XMLSerializer().serializeToString(svgClone);
         const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
         const URLObj = window.URL || window.webkitURL || window;
@@ -77,11 +100,12 @@ class ExportPngService {
         const image = new Image();
         image.onload = async () => {
           const canvas = document.createElement('canvas');
-          canvas.width = width * 2;
-          canvas.height = height * 2;
+          const outputScale = Math.max(0.25, Math.min(2, 8192 / width, 8192 / height));
+          canvas.width = Math.round(width * outputScale);
+          canvas.height = Math.round(height * outputScale);
 
           const ctx = canvas.getContext('2d');
-          ctx.scale(2, 2);
+          ctx.scale(outputScale, outputScale);
 
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, width, height);
@@ -126,11 +150,95 @@ class ExportPngService {
     });
   }
 
+  prepareMerClone(svgClone) {
+    const measureCanvas = document.createElement('canvas');
+    const ctx = measureCanvas.getContext('2d');
+
+    svgClone.querySelectorAll('.diagram-node').forEach(node => {
+      const text = node.querySelector(':scope > text');
+      if (!text) return;
+
+      let font = '500 12px Inter, Arial, sans-serif';
+      let fontSize = 12;
+      let fontWeight = '500';
+      if (node.classList.contains('entity')) {
+        font = '700 14px Inter, Arial, sans-serif';
+        fontSize = 14;
+        fontWeight = '700';
+      } else if (node.classList.contains('relation')) {
+        font = '600 13px Inter, Arial, sans-serif';
+        fontSize = 13;
+        fontWeight = '600';
+      } else if (node.classList.contains('attribute-primary')) {
+        font = '700 12px Inter, Arial, sans-serif';
+        fontWeight = '700';
+      }
+
+      ctx.font = font;
+      const textWidth = Math.ceil(ctx.measureText(text.textContent || ' ').width);
+      text.setAttribute('font-family', 'Inter, Arial, sans-serif');
+      text.setAttribute('font-size', String(fontSize));
+      text.setAttribute('font-weight', fontWeight);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('dominant-baseline', 'middle');
+      text.setAttribute('alignment-baseline', 'middle');
+
+      if (node.classList.contains('entity')) {
+        const shape = node.querySelector('.shape-entity');
+        if (!shape) return;
+        const oldWidth = parseFloat(shape.getAttribute('width')) || 130;
+        const height = Math.max(parseFloat(shape.getAttribute('height')) || 48, fontSize + 28);
+        const width = Math.max(oldWidth, textWidth + 52);
+        shape.setAttribute('width', width);
+        shape.setAttribute('height', height);
+        text.setAttribute('x', width / 2);
+        text.setAttribute('y', height / 2);
+
+        const transform = node.getAttribute('transform') || '';
+        const match = transform.match(/translate\(\s*([-\d.]+)[,\s]+([-\d.]+)\s*\)/);
+        if (match && width !== oldWidth) {
+          node.setAttribute('transform', `translate(${parseFloat(match[1]) - (width - oldWidth) / 2}, ${parseFloat(match[2])})`);
+        }
+      } else if (node.classList.contains('relation')) {
+        const shape = node.querySelector('.shape-relation');
+        if (!shape) return;
+        const width = Math.max(110, textWidth + 64);
+        const height = Math.max(56, width * 0.52, fontSize + 32);
+        shape.setAttribute('points', `0,${-height / 2} ${width / 2},0 0,${height / 2} ${-width / 2},0`);
+        text.setAttribute('x', '0');
+        text.setAttribute('y', '0');
+      } else if (node.classList.contains('attribute')) {
+        const rx = Math.max(45, (textWidth + 38) / 2);
+        const ry = Math.max(20, (fontSize + 24) / 2);
+        node.querySelectorAll('.shape-attribute, .shape-multivalued-outer').forEach(shape => {
+          shape.setAttribute('rx', rx);
+          shape.setAttribute('ry', ry);
+        });
+        node.querySelectorAll('.shape-multivalued-inner').forEach(shape => {
+          shape.setAttribute('rx', Math.max(1, rx - 4));
+          shape.setAttribute('ry', Math.max(1, ry - 4));
+        });
+        text.setAttribute('x', '0');
+        text.setAttribute('y', '0');
+      }
+    });
+
+    // Inline cardinality alignment as external stylesheets are not available
+    // after the SVG is serialized into an image.
+    svgClone.querySelectorAll('.cardinality-text').forEach(text => {
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('dominant-baseline', 'middle');
+      text.setAttribute('alignment-baseline', 'middle');
+      text.setAttribute('font-family', 'JetBrains Mono, monospace');
+      text.setAttribute('font-size', '11');
+    });
+  }
+
   /**
    * Export DER Logical Model as PNG
    * Programmatically draws tables/columns on a canvas
    */
-  async exportDerPNG(tables, filename = 'modelo-logico-der.png') {
+  async exportDerPNG(tables, filename = 'modelo-logico-der.png', logicalLayout = {}) {
     return new Promise(async (resolve, reject) => {
       try {
         if (!tables || tables.length === 0) {
@@ -141,25 +249,18 @@ class ExportPngService {
         const CARD_W = 280;
         const HEADER_H = 34;
         const ROW_H = 22;
-        const CARD_PAD = 24;
-        const COLS_PER_ROW = 3;
         const MARGIN = 40;
-
-        // Calculate grid layout
         const cardHeights = tables.map(t => HEADER_H + t.columns.length * ROW_H + 8);
-        const rows = Math.ceil(tables.length / COLS_PER_ROW);
-        const maxRowHeights = [];
-        for (let r = 0; r < rows; r++) {
-          let maxH = 0;
-          for (let c = 0; c < COLS_PER_ROW; c++) {
-            const idx = r * COLS_PER_ROW + c;
-            if (idx < cardHeights.length) maxH = Math.max(maxH, cardHeights[idx]);
-          }
-          maxRowHeights.push(maxH);
-        }
-
-        const totalW = MARGIN * 2 + COLS_PER_ROW * (CARD_W + CARD_PAD) - CARD_PAD;
-        const totalH = MARGIN * 2 + maxRowHeights.reduce((s, h) => s + h + CARD_PAD, 0) - CARD_PAD + 50;
+        const positions = tables.map((table, index) => logicalLayout[table.id || table.name] || {
+          x: (index % 3) * 330,
+          y: Math.floor(index / 3) * 300
+        });
+        const minX = Math.min(...positions.map(p => p.x));
+        const minY = Math.min(...positions.map(p => p.y));
+        const maxX = Math.max(...positions.map(p => p.x + CARD_W));
+        const maxY = Math.max(...positions.map((p, index) => p.y + cardHeights[index]));
+        const totalW = maxX - minX + MARGIN * 2;
+        const totalH = maxY - minY + MARGIN * 2 + 30;
 
         const canvas = document.createElement('canvas');
         canvas.width = totalW * 2;
@@ -176,15 +277,29 @@ class ExportPngService {
         ctx.font = 'bold 16px Inter, Arial, sans-serif';
         ctx.fillText('Modelo Lógico Relacional (DER) — MER Studio v1.0', MARGIN, MARGIN - 10);
 
-        let cursorY = MARGIN + 20;
+        // FK lines preserve the same spatial relationships visible in DER.
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = '#666666';
+        tables.forEach((table, tableIndex) => {
+          table.columns.forEach((column, columnIndex) => {
+            if (!column.isFk || !column.refTable || !column.refColumn) return;
+            const targetIndex = tables.findIndex(item => item.name === column.refTable);
+            if (targetIndex < 0) return;
+            const targetColumn = tables[targetIndex].columns.findIndex(item => item.name === column.refColumn);
+            if (targetColumn < 0) return;
+            const sourcePos = positions[tableIndex];
+            const targetPos = positions[targetIndex];
+            ctx.beginPath();
+            ctx.moveTo(sourcePos.x - minX + MARGIN + CARD_W / 2, sourcePos.y - minY + MARGIN + HEADER_H + columnIndex * ROW_H + ROW_H / 2);
+            ctx.lineTo(targetPos.x - minX + MARGIN + CARD_W / 2, targetPos.y - minY + MARGIN + HEADER_H + targetColumn * ROW_H + ROW_H / 2);
+            ctx.stroke();
+          });
+        });
+        ctx.setLineDash([]);
 
         tables.forEach((table, tIdx) => {
-          const col = tIdx % COLS_PER_ROW;
-          const row = Math.floor(tIdx / COLS_PER_ROW);
-
-          const x = MARGIN + col * (CARD_W + CARD_PAD);
-          let y = MARGIN + 20;
-          for (let r = 0; r < row; r++) y += maxRowHeights[r] + CARD_PAD;
+          const x = positions[tIdx].x - minX + MARGIN;
+          const y = positions[tIdx].y - minY + MARGIN;
 
           const cardH = HEADER_H + table.columns.length * ROW_H + 8;
 

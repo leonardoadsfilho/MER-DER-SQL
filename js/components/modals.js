@@ -4,10 +4,9 @@
  */
 
 class ModalManager {
-  constructor(state, relationalEngine, sqlGenerator) {
+  constructor(state, relationalEngine) {
     this.state = state;
     this.relational = relationalEngine;
-    this.sqlGen = sqlGenerator;
 
     this.activeModal = null;
     this.toastContainer = document.getElementById('toast-container') || this.createToastContainer();
@@ -122,17 +121,6 @@ class ModalManager {
     }
 
     this.openModal('modal-relational');
-  }
-
-  openSqlModal() {
-    const sqlCode = this.sqlGen.generateDDL(this.state);
-    const textarea = document.getElementById('sql-code-output');
-
-    if (textarea) {
-      textarea.value = sqlCode;
-    }
-
-    this.openModal('modal-sql');
   }
 
   openWizard(sourceEntityId) {

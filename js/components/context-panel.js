@@ -18,6 +18,15 @@ class ContextPanel {
 
   init() {
     this.state.on('selection:changed', () => {
+      // A selection change must always replace the current editor, even when
+      // the previous name input still owns focus. The typing guard only
+      // protects live updates of the same selected element.
+      const activeElement = document.activeElement;
+      if (activeElement && this.panel.contains(activeElement)) {
+        activeElement.blur();
+      }
+      this.isTyping = false;
+      this.setNameEditing(null, false);
       this.render();
     });
     this.state.on('element:edit-name', ({ id } = {}) => {

@@ -12,6 +12,7 @@ class DiagramState {
     this.viewport = { x: 0, y: 0, zoom: 1 };
     this.logicalLayout = {};
     this.logicalColumnOverrides = {};
+    this.derViewport = { x: 0, y: 0, scale: 1 };
     
     // Undo / Redo Stacks
     this.history = [];
@@ -376,7 +377,8 @@ class DiagramState {
       connections: this.connections,
       viewport: this.viewport,
       logicalLayout: this.logicalLayout,
-      logicalColumnOverrides: this.logicalColumnOverrides
+      logicalColumnOverrides: this.logicalColumnOverrides,
+      derViewport: this.derViewport
     }, null, 2);
   }
 
@@ -409,6 +411,9 @@ class DiagramState {
       this.logicalColumnOverrides = data.logicalColumnOverrides && typeof data.logicalColumnOverrides === 'object'
         ? data.logicalColumnOverrides
         : {};
+      this.derViewport = data.derViewport && typeof data.derViewport === 'object'
+        ? data.derViewport
+        : { x: 0, y: 0, scale: 1 };
 
       this.emit('state:reset');
       this.emit('change', { type: 'state:reset' });
@@ -427,6 +432,7 @@ class DiagramState {
     this.selectedConnectionIds.clear();
     this.logicalLayout = {};
     this.logicalColumnOverrides = {};
+    this.derViewport = { x: 0, y: 0, scale: 1 };
     this.emit('state:reset');
     this.emit('change', { type: 'state:cleared' });
   }
@@ -455,6 +461,11 @@ class DiagramState {
     if (!Object.prototype.hasOwnProperty.call(this.logicalColumnOverrides, key)) return;
     delete this.logicalColumnOverrides[key];
     this.emit('change', { type: 'logical:column-override-removed', tableKey, columnName });
+  }
+
+  updateDerViewport(viewport) {
+    this.derViewport = { ...this.derViewport, ...viewport };
+    this.emit('change', { type: 'logical:viewport' });
   }
 }
 

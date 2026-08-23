@@ -9,6 +9,7 @@ class App {
   }
 
   init() {
+    document.documentElement.classList.toggle('touch-device', navigator.maxTouchPoints > 0);
     // 1. Theme Manager
     this.theme = new window.ThemeManager('dark');
 
@@ -29,7 +30,7 @@ class App {
     this.exportPng = new window.ExportPngService(svgElement, this.theme, this.storage);
 
     // 5. Modals & Context Panel
-    this.modals = new window.ModalManager(this.state, this.relational, this.sqlGen);
+    this.modals = new window.ModalManager(this.state, this.relational);
     this.contextPanel = new window.ContextPanel(document.getElementById('app-context-panel'), this.state, this.modals);
 
     // 6. Logical Relational Editor (Tab 2)
@@ -64,8 +65,14 @@ class App {
       this.logicalEditor,
       this.toolbar,
       this.contextPanel,
-      this.state
+      this.state,
+      this.sqlGen
     );
+    this.state.on('change', () => {
+      if (this.tabs.activeTab !== 'sql') return;
+      const output = document.getElementById('sql-code-output');
+      if (output) output.value = this.sqlGen.generateDDL(this.state);
+    });
 
     // 9. Bind Header Actions
     this.bindHeaderActions();
@@ -135,37 +142,24 @@ class App {
       });
     }
 
-    // Export PNG (Black and White Academic Style)
-    const btnExportPng = document.getElementById('btn-export-png');
-    if (btnExportPng) {
-      btnExportPng.addEventListener('click', async () => {
-        try {
-          this.modals.showToast('Renderizando imagem P&B acadêmica com asterisco...', 'info', 1500);
-          await this.exportPng.exportPNG('diagrama-mer-academico.png', true);
-          this.modals.showToast('Imagem PNG (Preto e Branco) gerada com sucesso!', 'success');
-        } catch (err) {
-          this.modals.showToast('Erro ao exportar PNG: ' + err.message, 'error');
-        }
-      });
-    }
-
-    // Open SQL Modal
-    const btnOpenSql = document.getElementById('btn-generate-sql');
-    if (btnOpenSql) {
-      btnOpenSql.addEventListener('click', () => {
-        this.modals.openSqlModal();
-      });
-    }
-
     // Copy SQL Button
     const btnCopySql = document.getElementById('btn-copy-sql');
     if (btnCopySql) {
-      btnCopySql.addEventListener('click', () => {
+      btnCopySql.addEventListener('click', async () => {
         const textarea = document.getElementById('sql-code-output');
         if (textarea) {
-          navigator.clipboard.writeText(textarea.value).then(() => {
+          try {
+            if (navigator.clipboard && window.isSecureContext) {
+              await navigator.clipboard.writeText(textarea.value);
+            } else {
+              textarea.select();
+              document.execCommand('copy');
+              textarea.setSelectionRange(0, 0);
+            }
             this.modals.showToast('Código SQL copiado para a área de transferência!', 'success');
-          });
+          } catch (error) {
+            this.modals.showToast('Não foi possível copiar o SQL.', 'error');
+          }
         }
       });
     }

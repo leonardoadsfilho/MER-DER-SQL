@@ -33,12 +33,29 @@ class Toolbar {
       });
     }
 
-    const btnSideCopySql = document.getElementById('btn-side-copy-sql');
-    if (btnSideCopySql && this.modals) {
-      btnSideCopySql.addEventListener('click', () => {
-        this.modals.openSqlModal();
-      });
-    }
+    const btnRelationship = document.getElementById('btn-side-add-relationship');
+    if (btnRelationship && this.logical) btnRelationship.addEventListener('click', () => this.logical.openDerRelationshipDialog());
+
+    const btnMerPng = document.getElementById('btn-side-export-mer');
+    if (btnMerPng) btnMerPng.addEventListener('click', async () => {
+      try {
+        await this.exportPng.exportPNG('diagrama-mer-academico.png', true);
+        this.modals.showToast('PNG do MER exportado com sucesso!', 'success');
+      } catch (error) {
+        this.modals.showToast('Erro ao exportar PNG: ' + error.message, 'error');
+      }
+    });
+
+    const btnDerPng = document.getElementById('btn-side-export-der');
+    if (btnDerPng && this.logical) btnDerPng.addEventListener('click', () => this.logical.exportCurrentPNG());
+
+    const btnClearDer = document.getElementById('btn-side-clear-der');
+    if (btnClearDer) btnClearDer.addEventListener('click', () => {
+      if (confirm('Tem certeza que deseja excluir TODAS as tabelas e relacionamentos?')) {
+        this.state.clearAll();
+        this.modals.showToast('Modelo inteiramente limpo.', 'info');
+      }
+    });
 
     // 3. Zoom overlay buttons
     const btnZoomIn = document.getElementById('btn-zoom-in');
