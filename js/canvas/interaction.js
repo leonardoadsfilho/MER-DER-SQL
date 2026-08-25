@@ -23,6 +23,10 @@ class CanvasInteraction {
     this.spacePressed = false;
 
     this.previewLine = null;
+    
+    this.pointers = new Map();
+    this.initialPinchDistance = null;
+    this.initialPinchZoom = null;
 
     this.initEvents();
   }
@@ -51,6 +55,19 @@ class CanvasInteraction {
   }
 
   onMouseDown(e) {
+    if (e.pointerId !== undefined) {
+      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+
+    if (this.pointers.size === 2) {
+      this.isPanning = false;
+      this.isDragging = false;
+      const pts = Array.from(this.pointers.values());
+      this.initialPinchDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      this.initialPinchZoom = this.state.viewport.zoom;
+      return;
+    }
+
     const touchPan = e.pointerType !== 'mouse' &&
       !e.target.closest('.diagram-node, [data-conn-id], .connect-handle');
     if (e.button === 1 || (e.button === 0 && this.spacePressed) || touchPan) {
@@ -156,6 +173,36 @@ class CanvasInteraction {
   }
 
   onMouseMove(e) {
+    if (e.pointerId !== undefined && this.pointers.has(e.pointerId)) {
+      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+
+    if (this.pointers.size === 2 && this.initialPinchDistance !== null) {
+      const pts = Array.from(this.pointers.values());
+      const currentDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      if (this.initialPinchDistance > 0) {
+        const zoomFactor = currentDistance / this.initialPinchDistance;
+        let newZoom = this.initialPinchZoom * zoomFactor;
+        newZoom = Math.max(0.2, Math.min(newZoom, 3.0));
+
+        // Center point of the pinch
+        const centerX = (pts[0].x + pts[1].x) / 2;
+        const centerY = (pts[0].y + pts[1].y) / 2;
+
+        const rect = this.svg.getBoundingClientRect();
+        const mouseX = centerX - rect.left;
+        const mouseY = centerY - rect.top;
+
+        const deltaZoom = newZoom - this.state.viewport.zoom;
+        this.state.viewport.x -= (mouseX - this.state.viewport.x) * (deltaZoom / this.state.viewport.zoom);
+        this.state.viewport.y -= (mouseY - this.state.viewport.y) * (deltaZoom / this.state.viewport.zoom);
+        this.state.viewport.zoom = newZoom;
+        
+        this.applyViewportTransform();
+      }
+      return;
+    }
+
     if (this.isPanning) {
       const dx = e.clientX - this.panStartPos.x;
       const dy = e.clientY - this.panStartPos.y;
@@ -195,6 +242,13 @@ class CanvasInteraction {
   }
 
   onMouseUp(e) {
+    if (e.pointerId !== undefined) {
+      this.pointers.delete(e.pointerId);
+    }
+    if (this.pointers.size < 2) {
+      this.initialPinchDistance = null;
+    }
+
     if (this.isPanning) {
       this.isPanning = false;
       this.viewport.style.cursor = this.spacePressed ? 'grab' : 'default';

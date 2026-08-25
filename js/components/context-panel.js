@@ -49,6 +49,13 @@ class ContextPanel {
       }
     });
 
+    this.panel.addEventListener('click', (e) => {
+      if (e.target.closest('.btn-close-panel')) {
+        this.panel.classList.add('closed-by-user');
+        this.panel.classList.remove('open-mobile');
+      }
+    });
+
     this.render();
   }
 
@@ -61,24 +68,28 @@ class ContextPanel {
     const totalSelected = selectedNodes.length + selectedConns.length;
 
     if (totalSelected === 0) {
+      this.panel.classList.remove('open-mobile');
       this.renderEmptyState();
-    } else if (totalSelected === 1) {
-      if (selectedNodes.length === 1) {
-        const element = selectedNodes[0];
-        if (element.type === 'entity') {
-          this.renderEntityPanel(element);
-        } else if (element.type === 'relation') {
-          this.renderRelationPanel(element);
-        } else if (element.type === 'attribute') {
-          this.renderAttributePanel(element);
-        }
-      } else if (selectedConns.length === 1) {
-        this.renderConnectionPanel(selectedConns[0]);
-      }
     } else {
-      this.renderMultiSelectPanel(selectedNodes, selectedConns);
+      this.panel.classList.remove('closed-by-user');
+      this.panel.classList.add('open-mobile');
+      if (totalSelected === 1) {
+        if (selectedNodes.length === 1) {
+          const element = selectedNodes[0];
+          if (element.type === 'entity') {
+            this.renderEntityPanel(element);
+          } else if (element.type === 'relation') {
+            this.renderRelationPanel(element);
+          } else if (element.type === 'attribute') {
+            this.renderAttributePanel(element);
+          }
+        } else if (selectedConns.length === 1) {
+          this.renderConnectionPanel(selectedConns[0]);
+        }
+      } else {
+        this.renderMultiSelectPanel(selectedNodes, selectedConns);
+      }
     }
-
   }
 
   setNameEditing(elementId, editing) {
@@ -115,6 +126,7 @@ class ContextPanel {
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
           Propriedades
         </h3>
+        <button class="btn btn-secondary btn-sm btn-icon btn-close-panel" title="Ocultar Painel">✕</button>
       </div>
       <div class="panel-body">
         <div class="empty-state">
@@ -151,9 +163,12 @@ class ContextPanel {
           <span class="badge badge-pk" style="font-size: 11px;">Entidade</span>
           <span class="panel-title-text">${entity.name}</span>
         </h3>
-        <button id="btn-delete-element" class="btn btn-danger btn-sm btn-icon" title="Excluir Entidade">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-        </button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button id="btn-delete-element" class="btn btn-danger btn-sm btn-icon" title="Excluir Entidade">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
+          <button class="btn btn-secondary btn-sm btn-icon btn-close-panel" title="Fechar (Deselecionar)">✕</button>
+        </div>
       </div>
 
       <div class="panel-body">
@@ -243,6 +258,13 @@ class ContextPanel {
     if (btnDelete) {
       btnDelete.addEventListener('click', () => {
         this.state.removeElement(entity.id);
+      });
+    }
+
+    const btnClose = this.panel.querySelector('.btn-close-panel');
+    if (btnClose) {
+      btnClose.addEventListener('click', () => {
+        this.state.clearSelection();
       });
     }
 
@@ -365,9 +387,12 @@ class ContextPanel {
           <span class="badge badge-fk" style="font-size: 11px;">Relacionamento</span>
           <span class="panel-title-text">${relation.name}</span>
         </h3>
-        <button id="btn-delete-element" class="btn btn-danger btn-sm btn-icon" title="Excluir Relacionamento">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-        </button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button id="btn-delete-element" class="btn btn-danger btn-sm btn-icon" title="Excluir Relacionamento">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
+          <button class="btn btn-secondary btn-sm btn-icon btn-close-panel" title="Fechar (Deselecionar)">✕</button>
+        </div>
       </div>
 
       <div class="panel-body">
@@ -467,6 +492,13 @@ class ContextPanel {
       });
     }
 
+    const btnClose = this.panel.querySelector('.btn-close-panel');
+    if (btnClose) {
+      btnClose.addEventListener('click', () => {
+        this.state.clearSelection();
+      });
+    }
+
     // Change Source Entity
     const selSource = this.panel.querySelector('#select-rel-source-entity');
     if (selSource) {
@@ -541,9 +573,12 @@ class ContextPanel {
           <span class="badge ${this.getBadgeClass(attr.attrType)}">${this.getBadgeLabel(attr.attrType)}</span>
           <span class="panel-title-text">${attr.name}</span>
         </h3>
-        <button id="btn-delete-element" class="btn btn-danger btn-sm btn-icon" title="Excluir Atributo">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-        </button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button id="btn-delete-element" class="btn btn-danger btn-sm btn-icon" title="Excluir Atributo">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
+          <button class="btn btn-secondary btn-sm btn-icon btn-close-panel" title="Fechar (Deselecionar)">✕</button>
+        </div>
       </div>
 
       <div class="panel-body">
@@ -678,6 +713,13 @@ class ContextPanel {
       });
     }
 
+    const btnClose = this.panel.querySelector('.btn-close-panel');
+    if (btnClose) {
+      btnClose.addEventListener('click', () => {
+        this.state.clearSelection();
+      });
+    }
+
     const btnParent = this.panel.querySelector('#btn-focus-parent');
     if (btnParent && attr.parentId) {
       btnParent.addEventListener('click', () => {
@@ -702,9 +744,12 @@ class ContextPanel {
           <span class="badge badge-fk" style="font-size: 11px;">Linha</span>
           Conexão
         </h3>
-        <button id="btn-delete-conn" class="btn btn-danger btn-sm btn-icon" title="Excluir Linha de Conexão (Delete)">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-        </button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button id="btn-delete-conn" class="btn btn-danger btn-sm btn-icon" title="Excluir Linha de Conexão (Delete)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
+          <button class="btn btn-secondary btn-sm btn-icon btn-close-panel" title="Fechar (Deselecionar)">✕</button>
+        </div>
       </div>
 
       <div class="panel-body">
@@ -747,6 +792,13 @@ class ContextPanel {
     if (btnDel) btnDel.addEventListener('click', handleDelete);
     if (btnDelAct) btnDelAct.addEventListener('click', handleDelete);
 
+    const btnClose = this.panel.querySelector('.btn-close-panel');
+    if (btnClose) {
+      btnClose.addEventListener('click', () => {
+        this.state.clearSelection();
+      });
+    }
+
     if (selCard) {
       selCard.addEventListener('change', (e) => {
         conn.cardinalityTo = e.target.value;
@@ -767,9 +819,12 @@ class ContextPanel {
           <span class="badge badge-pk">${total}</span>
           Itens Selecionados
         </h3>
-        <button id="btn-delete-all-selected" class="btn btn-danger btn-sm btn-icon" title="Excluir Todos">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-        </button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button id="btn-delete-all-selected" class="btn btn-danger btn-sm btn-icon" title="Excluir Todos">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
+          <button class="btn btn-secondary btn-sm btn-icon btn-close-panel" title="Fechar (Deselecionar)">✕</button>
+        </div>
       </div>
       <div class="panel-body">
         <p style="font-size: var(--font-size-xs); color: var(--text-muted);">
@@ -812,6 +867,13 @@ class ContextPanel {
     const btnBulkDel = this.panel.querySelector('#btn-bulk-delete');
     if (btnDel) btnDel.addEventListener('click', handleDelete);
     if (btnBulkDel) btnBulkDel.addEventListener('click', handleDelete);
+
+    const btnClose = this.panel.querySelector('.btn-close-panel');
+    if (btnClose) {
+      btnClose.addEventListener('click', () => {
+        this.state.clearSelection();
+      });
+    }
   }
 
   getBadgeClass(type) {

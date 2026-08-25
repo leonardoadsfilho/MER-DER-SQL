@@ -146,15 +146,19 @@ class App {
     const btnCopySql = document.getElementById('btn-copy-sql');
     if (btnCopySql) {
       btnCopySql.addEventListener('click', async () => {
-        const textarea = document.getElementById('sql-code-output');
-        if (textarea) {
+        const output = document.getElementById('sql-code-output');
+        if (output) {
+          const sqlText = output.innerText || output.textContent;
           try {
             if (navigator.clipboard && window.isSecureContext) {
-              await navigator.clipboard.writeText(textarea.value);
+              await navigator.clipboard.writeText(sqlText);
             } else {
-              textarea.select();
+              const tempInput = document.createElement('textarea');
+              tempInput.value = sqlText;
+              document.body.appendChild(tempInput);
+              tempInput.select();
               document.execCommand('copy');
-              textarea.setSelectionRange(0, 0);
+              document.body.removeChild(tempInput);
             }
             this.modals.showToast('Código SQL copiado para a área de transferência!', 'success');
           } catch (error) {
@@ -168,8 +172,8 @@ class App {
     const btnDownloadSql = document.getElementById('btn-download-sql');
     if (btnDownloadSql) {
       btnDownloadSql.addEventListener('click', async () => {
-        const textarea = document.getElementById('sql-code-output');
-        const sqlCode = textarea ? textarea.value : '';
+        const output = document.getElementById('sql-code-output');
+        const sqlCode = output ? (output.innerText || output.textContent) : '';
         const blob = new Blob([sqlCode], { type: 'text/plain;charset=utf-8' });
 
         if (this.storage && this.storage.exportFile) {

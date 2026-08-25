@@ -11,6 +11,10 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+input, textarea, select {
+  font-size: 16px; /* Evitar zoom automático no iOS */
+}
+
 html, body {
   width: 100%;
   height: 100%;
@@ -164,7 +168,7 @@ html, body {
 .sql-tab-header h2 { font-size: var(--font-size-lg); }
 .sql-tab-header span { color: var(--text-muted); font-size: var(--font-size-xs); }
 .sql-tab-actions { display: flex; gap: .5rem; }
-.sql-tab-code { flex: 1; width: 100%; min-height: 0; resize: none; padding: 1rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: #0b1020; color: #d1fae5; font: 13px/1.6 var(--font-mono); user-select: text; outline: none; }
+.sql-tab-code { flex: 1; width: 100%; min-height: 0; padding: 1rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-surface-elevated); color: var(--text-main); font: 13px/1.6 var(--font-mono); user-select: text; outline: none; overflow-y: auto; overflow-x: auto; white-space: pre; }
 
 .orientation-overlay { display: none; position: fixed; inset: 0; z-index: 10000; background: var(--bg-app); align-items: center; justify-content: center; padding: 2rem; }
 .orientation-card { max-width: 360px; text-align: center; color: var(--text-main); }

@@ -85,7 +85,7 @@ class TabsManager {
       if (toolbarContainer) toolbarContainer.style.display = 'none';
       if (contextPanel) contextPanel.style.display = 'none';
       const output = document.getElementById('sql-code-output');
-      if (output && this.sqlGenerator) output.value = this.sqlGenerator.generateDDL(this.state);
+      if (output && this.sqlGenerator) output.innerHTML = this.sqlGenerator.generateDDL(this.state, true);
     }
   }
 }

@@ -3,13 +3,18 @@
  * Generates clean, standard CREATE TABLE scripts from Relational Schema
  * Editor de MER Conceptual v2.0
  */
+/**
+ * SQL DDL Generator Service
+ * Generates clean, standard CREATE TABLE scripts from Relational Schema
+ * Editor de MER Conceptual v2.0
+ */
 
 class SqlGenerator {
   constructor(relationalEngine) {
     this.relationalEngine = relationalEngine;
   }
 
-  generateDDL(state) {
+  generateDDL(state, asHtml = false) {
     const tables = this.relationalEngine.generateRelationalSchema(state);
 
     if (tables.length === 0) {
@@ -27,16 +32,26 @@ class SqlGenerator {
     const dependentTables = tables.filter(t => t.isAssociative);
     const sortedTables = [...baseTables, ...dependentTables];
 
+    const wrapHtml = (text, type) => {
+      if (!asHtml) return text;
+      let colorVar = '';
+      if (type === 'entity') colorVar = 'var(--shape-entity-stroke)';
+      else if (type === 'relation') colorVar = 'var(--shape-relation-stroke)';
+      else if (type === 'attribute') colorVar = 'var(--shape-attribute-stroke)';
+      return `<span style="color: ${colorVar}; font-weight: bold;">${text}</span>`;
+    };
+
     sortedTables.forEach(table => {
       lines.push(`-- Tabela: ${table.name}`);
-      lines.push(`CREATE TABLE IF NOT EXISTS \`${table.name}\` (`);
+      const tableType = table.isAssociative ? 'relation' : 'entity';
+      lines.push(`CREATE TABLE IF NOT EXISTS \`${wrapHtml(table.name, tableType)}\` (`);
 
       const columnDefs = [];
       const primaryKeys = [];
       const foreignKeys = [];
 
       table.columns.forEach(col => {
-        let def = `  \`${col.name}\` ${col.type}`;
+        let def = `  \`${wrapHtml(col.name, 'attribute')}\` ${col.type}`;
 
         if (col.isAutoIncrement && col.isPk) {
           def += ' AUTO_INCREMENT';
@@ -53,12 +68,15 @@ class SqlGenerator {
         columnDefs.push(def);
 
         if (col.isPk) {
-          primaryKeys.push(`\`${col.name}\``);
+          primaryKeys.push(`\`${wrapHtml(col.name, 'attribute')}\``);
         }
 
         if (col.isFk && col.refTable && col.refColumn) {
+          // Find if the refTable is a relation or entity
+          const refTbl = tables.find(t => t.name === col.refTable);
+          const refType = refTbl && refTbl.isAssociative ? 'relation' : 'entity';
           foreignKeys.push(
-            `  CONSTRAINT \`fk_${table.name}_${col.name}\` FOREIGN KEY (\`${col.name}\`) REFERENCES \`${col.refTable}\` (\`${col.refColumn}\`) ON DELETE CASCADE ON UPDATE CASCADE`
+            `  CONSTRAINT \`fk_${table.name}_${col.name}\` FOREIGN KEY (\`${wrapHtml(col.name, 'attribute')}\`) REFERENCES \`${wrapHtml(col.refTable, refType)}\` (\`${wrapHtml(col.refColumn, 'attribute')}\`) ON DELETE CASCADE ON UPDATE CASCADE`
           );
         }
       });

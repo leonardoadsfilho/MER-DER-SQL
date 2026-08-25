@@ -145,3 +145,24 @@
   font-size: 11px;
   color: var(--text-subtle);
 }
+
+/* --------------------------------------------------------------------------
+   Mobile Enhancements (Full Screen Modals)
+   -------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  .modal-backdrop {
+    padding: 0;
+    align-items: flex-end; /* Or stretch */
+  }
+  .modal-container {
+    max-width: 100%;
+    max-height: 100dvh;
+    height: 100dvh;
+    border-radius: 0;
+    border: none;
+    transform: translateY(100%);
+  }
+  .modal-backdrop.active .modal-container {
+    transform: translateY(0);
+  }
+}

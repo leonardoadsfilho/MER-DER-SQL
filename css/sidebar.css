@@ -52,7 +52,10 @@
   position: relative;
 }
 
-.tool-card-danger { color: var(--color-danger); border-color: rgba(239, 68, 68, .35); }
+.tool-card-danger {
+  color: var(--color-danger);
+  border-color: rgba(239, 68, 68, .35);
+}
 
 .tool-card:hover {
   background-color: var(--bg-surface-hover);
@@ -78,6 +81,7 @@
   font-size: 10px;
   font-weight: 600;
   letter-spacing: -0.01em;
+  text-align: center;
 }
 
 /* --------------------------------------------------------------------------
@@ -152,7 +156,8 @@
   color: var(--text-muted);
 }
 
-.form-input, .form-select {
+.form-input,
+.form-select {
   width: 100%;
   height: 38px;
   background-color: var(--bg-surface-elevated);
@@ -166,7 +171,8 @@
   transition: all var(--transition-fast);
 }
 
-.form-input:focus, .form-select:focus {
+.form-input:focus,
+.form-select:focus {
   border-color: var(--border-focus);
   box-shadow: 0 0 0 2px var(--color-primary-subtle);
   background-color: var(--bg-surface);
@@ -266,4 +272,119 @@
   align-items: center;
   justify-content: center;
   color: var(--text-subtle);
+}
+
+/* --------------------------------------------------------------------------
+   Mobile Enhancements (Bottom Navigation & Bottom Sheet)
+   -------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+
+  /* Transform Left Toolbar to Bottom Navigation */
+  .app-workspace {
+    flex-direction: column;
+  }
+
+  .app-toolbar {
+    width: 100%;
+    height: 70px;
+    flex-direction: row;
+    border-right: none;
+    border-top: 1px solid var(--border-subtle);
+    padding: 0.5rem 1rem;
+    gap: 1rem;
+    order: 2;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    z-index: var(--z-sidebar);
+  }
+
+  .toolbar-group {
+    flex-direction: row;
+    width: auto;
+    gap: 0.75rem;
+  }
+
+  .toolbar-divider {
+    width: 1px;
+    height: 32px;
+    margin: 0 0.25rem;
+  }
+
+  /* Transform Context Panel to Bottom Sheet */
+  .app-context-panel {
+    position: fixed;
+    bottom: 70px;
+    left: 0;
+    width: 100%;
+    height: 60dvh;
+    border-left: none;
+    border-top: 1px solid var(--border-subtle);
+    border-top-left-radius: 1rem;
+    border-top-right-radius: 1rem;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    z-index: calc(var(--z-sidebar) + 10);
+  }
+
+  .app-context-panel.open-mobile {
+    transform: translateY(0);
+  }
+
+  /* Add a little handle at the top of the bottom sheet */
+  .panel-header::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 4px;
+    background-color: var(--border-strong);
+    border-radius: 2px;
+  }
+
+  .panel-header {
+    padding-top: 1.5rem;
+    /* Make room for the handle */
+    position: relative;
+  }
+}
+
+/* Colorized Tool Cards */
+.tool-card-entity {
+  color: var(--shape-entity-stroke);
+}
+
+.tool-card-entity.active {
+  box-shadow: 0 0 0 1px var(--shape-entity-stroke);
+  border-color: var(--shape-entity-stroke);
+}
+
+.tool-card-relation {
+  color: var(--shape-relation-stroke);
+}
+
+.tool-card-relation.active {
+  box-shadow: 0 0 0 1px var(--shape-relation-stroke);
+  border-color: var(--shape-relation-stroke);
+}
+
+.tool-card-attribute {
+  color: var(--shape-attribute-stroke);
+}
+
+.tool-card-attribute.active {
+  box-shadow: 0 0 0 1px var(--shape-attribute-stroke);
+  border-color: var(--shape-attribute-stroke);
+}
+
+.btn-close-panel {
+  display: inline-flex;
+  font-size: 16px;
+}
+
+.app-context-panel.closed-by-user {
+  display: none !important;
 }
