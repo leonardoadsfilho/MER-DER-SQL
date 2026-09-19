@@ -156,12 +156,7 @@ class LogicalEditor {
                   </div>
 
                   <select class="col-type-select" data-table-idx="${tIndex}" data-col-idx="${cIndex}">
-                    <option value="INT" ${col.type === 'INT' ? 'selected' : ''}>INT</option>
-                    <option value="VARCHAR(255)" ${col.type.startsWith('VARCHAR') ? 'selected' : ''}>VARCHAR(255)</option>
-                    <option value="TEXT" ${col.type === 'TEXT' ? 'selected' : ''}>TEXT</option>
-                    <option value="DATETIME" ${col.type === 'DATETIME' ? 'selected' : ''}>DATETIME</option>
-                    <option value="DECIMAL(10,2)" ${col.type.startsWith('DECIMAL') ? 'selected' : ''}>DECIMAL(10,2)</option>
-                    <option value="BOOLEAN" ${col.type === 'BOOLEAN' ? 'selected' : ''}>BOOLEAN</option>
+                    ${this.renderDataTypeOptions(col.type)}
                   </select>
 
                   <button class="btn-delete-col" data-table-idx="${tIndex}" data-col-idx="${cIndex}" title="Remover Coluna">✕</button>
@@ -432,7 +427,7 @@ class LogicalEditor {
       });
     });
 
-    // Delete Column (with PK cascade)
+    // Delete Column (with PK cascade and FK granular removal)
     this.container.querySelectorAll('.btn-delete-col').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -448,6 +443,11 @@ class LogicalEditor {
             this.handlePkDemotion(table.name, col.name);
           }
 
+          // If deleting a FK column, trigger granular relation cleanup
+          if (col.isFk) {
+            this.handleForeignKeyRemoval(table, col, false);
+          }
+
           if (table.id) {
             const attrs = this.state.getAttributesFor(table.id);
             const matchedAttr = attrs.find(a => a.name === col.name || a.name.replace(/^\*/, '') === col.name);
@@ -457,8 +457,6 @@ class LogicalEditor {
               }
               this.state.removeElement(matchedAttr.id);
             } else if (col.isPk) {
-              // An implicit PK has no MER attribute to remove. Suppress its
-              // regeneration and clear any DER override for this column.
               this.state.updateElement(table.id, { suppressImplicitPk: true });
               this.state.removeLogicalColumnOverride(table.id, col.name);
             }
@@ -489,47 +487,142 @@ class LogicalEditor {
     this.bindTableDragging();
   }
 
-  convertForeignKeyToColumn(table, column) {
-    // Associative tables do not have a single owning MER entity. Keep their
-    // edit as a DER override, without changing the PK flag.
-    if (!table.id) {
-      this.state.updateLogicalColumn(table.name, column.name, {
-        isFk: false,
-        refTable: null,
-        refColumn: null
+  renderDataTypeOptions(selectedType) {
+    const type = (selectedType || 'VARCHAR(255)').toUpperCase();
+    const groups = [
+      {
+        label: 'Numéricos Inteiros',
+        types: ['INT', 'BIGINT', 'SMALLINT', 'TINYINT']
+      },
+      {
+        label: 'Precisão / Decimais',
+        types: ['DECIMAL(10,2)', 'NUMERIC(12,2)', 'FLOAT', 'DOUBLE']
+      },
+      {
+        label: 'Textuais e Caracteres',
+        types: ['VARCHAR(255)', 'VARCHAR(100)', 'CHAR(36)', 'TEXT', 'LONGTEXT']
+      },
+      {
+        label: 'Data e Hora',
+        types: ['DATE', 'TIME', 'DATETIME', 'TIMESTAMP']
+      },
+      {
+        label: 'Especiais e Modernos',
+        types: ['BOOLEAN', 'UUID', 'JSON', 'BLOB']
+      }
+    ];
+
+    let html = '';
+    let found = false;
+
+    groups.forEach(group => {
+      html += `<optgroup label="${group.label}">`;
+      group.types.forEach(t => {
+        const isSel = (type === t || (t.startsWith('VARCHAR') && type.startsWith('VARCHAR') && t === 'VARCHAR(255)' && !type.includes('100')));
+        if (isSel) found = true;
+        html += `<option value="${t}" ${isSel ? 'selected' : ''}>${t}</option>`;
       });
-      return;
+      html += `</optgroup>`;
+    });
+
+    if (!found && selectedType) {
+      html = `<option value="${selectedType}" selected>${selectedType}</option>` + html;
     }
 
-    const owner = this.state.elements.get(table.id);
-    if (!owner || owner.type !== 'entity') return;
+    return html;
+  }
+
+  convertForeignKeyToColumn(table, column) {
+    this.handleForeignKeyRemoval(table, column, true);
+  }
+
+  handleForeignKeyRemoval(table, column, keepAsRegularColumn = false) {
+    if (!column || !column.isFk) return;
 
     this.state.pushSnapshot();
 
-    // Remove only relationships that produce this FK in this owner table.
-    const producingRelations = Array.from(this.state.elements.values()).filter(element =>
-      element.type === 'relation' && this.relationshipProducesForeignKey(element, owner, column)
-    );
-    producingRelations.forEach(relation => this.state.removeElement(relation.id, false));
+    const refTableName = (column.refTable || '').toLowerCase();
+    const currentTableName = (table.name || '').toLowerCase();
 
-    const existingAttribute = this.state.getAttributesFor(owner.id).find(attribute =>
-      this.relational.sanitizeIdentifier(attribute.name) === column.name
-    );
+    // 1. Is this table associative (or originating from a relationship)?
+    let relationFound = null;
 
-    if (existingAttribute) {
-      this.state.updateElement(existingAttribute.id, {
-        attrType: column.isPk ? 'primary' : 'simple',
-        sqlType: column.type
-      }, false);
-    } else {
-      this.state.addAttribute(owner.id, {
-        name: column.name,
-        attrType: column.isPk ? 'primary' : 'simple',
-        sqlType: column.type
-      });
+    if (table.isAssociative || (table.id && this.state.elements.get(table.id)?.type === 'relation')) {
+      relationFound = this.state.elements.get(table.id) ||
+        Array.from(this.state.elements.values()).find(el => el.type === 'relation' && this.relational.sanitizeIdentifier(el.name).toLowerCase() === currentTableName);
     }
 
-    this.state.removeLogicalColumnOverride(owner.id, column.name);
+    if (relationFound) {
+      // Find all entity connections to this relationship diamond
+      const relConns = this.state.connections.filter(c =>
+        c.type !== 'attribute_link' && (c.fromId === relationFound.id || c.toId === relationFound.id)
+      );
+
+      // Find the connection that links this relation specifically to the referenced entity
+      const connToDisconnect = relConns.find(c => {
+        const targetId = c.fromId === relationFound.id ? c.toId : c.fromId;
+        const targetEntity = this.state.elements.get(targetId);
+        return targetEntity && this.relational.sanitizeIdentifier(targetEntity.name).toLowerCase() === refTableName;
+      });
+
+      if (connToDisconnect) {
+        // Granular removal: remove ONLY this entity's connection from the relation
+        this.state.removeConnection(connToDisconnect.id, false);
+
+        // Check remaining connections in this relationship
+        const remainingConns = this.state.connections.filter(c =>
+          c.type !== 'attribute_link' && (c.fromId === relationFound.id || c.toId === relationFound.id)
+        );
+
+        // If fewer than 2 entities remain, remove the orphaned relation
+        if (remainingConns.length < 2) {
+          this.state.removeElement(relationFound.id, false);
+        }
+      }
+    } else {
+      // 2. Binary relationship (1:N or 1:1)
+      const ownerEntity = this.state.elements.get(table.id) ||
+        Array.from(this.state.elements.values()).find(el => el.type === 'entity' && this.relational.sanitizeIdentifier(el.name).toLowerCase() === currentTableName);
+
+      if (ownerEntity) {
+        const relations = Array.from(this.state.elements.values()).filter(el => el.type === 'relation');
+        const producingRelation = relations.find(rel => {
+          const endpoints = this.state.connections
+            .filter(c => c.type !== 'attribute_link' && (c.fromId === rel.id || c.toId === rel.id))
+            .map(c => this.state.elements.get(c.fromId === rel.id ? c.toId : c.fromId))
+            .filter(e => e && e.type === 'entity');
+
+          const hasOwner = endpoints.some(e => e.id === ownerEntity.id);
+          const hasRef = endpoints.some(e => this.relational.sanitizeIdentifier(e.name).toLowerCase() === refTableName);
+          return hasOwner && hasRef;
+        });
+
+        if (producingRelation) {
+          this.state.removeElement(producingRelation.id, false);
+        }
+
+        if (keepAsRegularColumn) {
+          const existingAttr = this.state.getAttributesFor(ownerEntity.id).find(a =>
+            this.relational.sanitizeIdentifier(a.name) === column.name
+          );
+          if (existingAttr) {
+            this.state.updateElement(existingAttr.id, {
+              attrType: column.isPk ? 'primary' : 'simple',
+              sqlType: column.type
+            }, false);
+          } else {
+            this.state.addAttribute(ownerEntity.id, {
+              name: column.name,
+              attrType: column.isPk ? 'primary' : 'simple',
+              sqlType: column.type
+            });
+          }
+          this.state.removeLogicalColumnOverride(ownerEntity.id, column.name);
+        }
+      }
+    }
+
+    this.state.emit('change', { type: 'logical:fk-removed' });
   }
 
   relationshipProducesForeignKey(relation, owner, column) {

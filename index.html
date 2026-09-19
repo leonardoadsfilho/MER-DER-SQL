@@ -252,6 +252,12 @@
             <h2>SQL gerado</h2><span>Atualizado a partir do estado atual do MER/DER</span>
           </div>
           <div class="sql-tab-actions">
+            <button id="btn-upload-sql-direct" class="btn btn-secondary" style="gap: 0.4rem;" title="Carregar arquivo .sql do computador">
+              <span>📁</span> Carregar Arquivo .sql
+            </button>
+            <button id="btn-import-sql-modal" class="btn btn-outline" style="gap: 0.4rem;" title="Importar script SQL e gerar MER e DER">
+              <span>📥</span> Importar SQL (Engenharia Reversa)
+            </button>
             <button id="btn-copy-sql" class="btn btn-secondary">Copiar Código</button>
             <button id="btn-download-sql" class="btn btn-primary">Baixar .sql</button>
           </div>
@@ -264,6 +270,20 @@
         <!-- Rendered dynamically by js/components/context-panel.js -->
       </aside>
     </div>
+
+    <!-- Status Bar Minimalista -->
+    <footer id="app-status-bar" class="app-status-bar">
+      <div class="status-bar-left">
+        <span class="status-indicator">●</span>
+        <span id="status-autosave">Salvo automaticamente</span>
+      </div>
+      <div class="status-bar-center">
+        <span id="status-model-summary">0 Entidades | 0 Relações | 0 Tabelas</span>
+      </div>
+      <div class="status-bar-right">
+        <span id="status-zoom-level">Zoom: 100%</span>
+      </div>
+    </footer>
 
     <!-- ======================================================================
          MODALS
@@ -326,6 +346,55 @@
       </div>
     </div>
 
+    <!-- Modal: Reverse Engineering SQL Import -->
+    <div id="modal-sql-import" class="modal-backdrop">
+      <div class="modal-container" style="max-width: 680px;">
+        <div class="modal-header">
+          <h2 class="modal-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            Engenharia Reversa: SQL para MER e DER
+          </h2>
+          <button class="btn btn-outline btn-sm btn-icon" id="btn-close-sql-import" title="Fechar">✕</button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size: var(--font-size-xs); color: var(--text-muted); line-height: 1.5; margin-bottom: 0.75rem;">
+            Importe seus comandos <code>CREATE TABLE</code> para reconstruir automaticamente os diagramas conceituais e lógicos. Você pode carregar um arquivo <code>.sql</code> ou colar o código diretamente.
+          </p>
+
+          <!-- Input oculto para upload de arquivo SQL -->
+          <input type="file" id="input-sql-file-upload" accept=".sql,.ddl,text/plain" style="display: none;" />
+
+          <!-- Dropzone Interativa -->
+          <div id="dropzone-sql-file" class="sql-dropzone" style="border: 2px dashed var(--border-subtle); border-radius: var(--radius-md); padding: 1.1rem; text-align: center; background: var(--bg-surface-elevated); margin-bottom: 0.75rem; cursor: pointer; transition: all var(--transition-normal);">
+            <div style="font-size: 26px; margin-bottom: 0.25rem;">📄</div>
+            <div style="font-weight: 600; font-size: var(--font-size-sm); color: var(--text-main);">Arraste e solte seu arquivo .sql aqui</div>
+            <div style="font-size: var(--font-size-xs); color: var(--text-muted); margin-top: 0.35rem;">
+              ou <button type="button" id="btn-browse-sql-file" class="btn btn-secondary btn-sm" style="margin-left: 0.35rem; display: inline-flex;">Escolher arquivo do computador</button>
+            </div>
+            <div id="sql-file-selected-name" style="font-size: 11px; color: var(--color-accent); font-weight: 600; margin-top: 0.4rem; display: none;"></div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.6rem;">
+            <div style="flex: 1; height: 1px; background: var(--border-subtle);"></div>
+            <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">ou cole o script SQL</span>
+            <div style="flex: 1; height: 1px; background: var(--border-subtle);"></div>
+          </div>
+
+          <div class="form-group">
+            <textarea id="textarea-import-sql" class="form-input" style="height: 180px; font-family: 'Fira Code', Consolas, monospace; font-size: 12px; resize: vertical;" placeholder="CREATE TABLE clientes (&#10;  id_cliente INT PRIMARY KEY AUTO_INCREMENT,&#10;  nome VARCHAR(100) NOT NULL&#10;);&#10;&#10;CREATE TABLE pedidos (&#10;  id_pedido INT PRIMARY KEY AUTO_INCREMENT,&#10;  id_cliente INT,&#10;  valor_total DECIMAL(10, 2),&#10;  FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente)&#10;);"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="btn-cancel-sql-import">Cancelar</button>
+          <button class="btn btn-accent" id="btn-confirm-sql-import">Gerar Diagramas (MER e DER)</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Notifications Root -->
     <div id="toast-container" class="toast-container"></div>
     <div id="orientation-overlay" class="orientation-overlay" aria-hidden="true">
@@ -345,6 +414,8 @@
   <script src="js/services/export-png.js" defer></script>
   <script src="js/services/relational-engine.js" defer></script>
   <script src="js/services/sql-generator.js" defer></script>
+  <script src="js/services/sql-parser.js" defer></script>
+  <script src="js/services/reverse-engineering.js" defer></script>
   <script src="js/logical/logical-editor.js" defer></script>
   <script src="js/components/minimap.js" defer></script>
   <script src="js/components/modals.js" defer></script>

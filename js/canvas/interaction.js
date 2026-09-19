@@ -342,6 +342,13 @@ class CanvasInteraction {
         toId: targetEl.id,
         type: 'attribute_link'
       });
+    } else if (sourceEl.type === 'attribute' && (targetEl.type === 'entity' || targetEl.type === 'relation')) {
+      sourceEl.parentId = targetEl.id;
+      this.state.addConnection({
+        fromId: targetEl.id,
+        toId: sourceEl.id,
+        type: 'attribute_link'
+      });
     }
   }
 

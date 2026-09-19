@@ -147,8 +147,7 @@ html, body {
 .app-workspace {
   display: flex;
   flex: 1;
-  height: calc(100vh - var(--header-height));
-  height: calc(100dvh - var(--header-height));
+  min-height: 0;
   position: relative;
   overflow: hidden;
 }

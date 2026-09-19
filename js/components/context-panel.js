@@ -367,6 +367,9 @@ class ContextPanel {
   // ------------------------------------------------------------------------
   // Relationship Selected Panel with Source/Target Entity Dropdowns
   // ------------------------------------------------------------------------
+  // ------------------------------------------------------------------------
+  // Relationship Selected Panel: Supports N participating entities & attributes
+  // ------------------------------------------------------------------------
   renderRelationPanel(relation) {
     const allEntities = Array.from(this.state.elements.values()).filter(el => el.type === 'entity');
     
@@ -375,11 +378,18 @@ class ContextPanel {
       c => (c.fromId === relation.id || c.toId === relation.id) && c.type !== 'attribute_link'
     );
 
-    const conn1 = relatedConns[0] || null;
-    const conn2 = relatedConns[1] || null;
+    const attachedAttrs = this.state.getAttributesFor(relation.id);
 
-    const sourceEntityId = conn1 ? (conn1.fromId === relation.id ? conn1.toId : conn1.fromId) : '';
-    const targetEntityId = conn2 ? (conn2.fromId === relation.id ? conn2.toId : conn2.fromId) : '';
+    // List of connected entity IDs
+    const connectedEntityIds = new Set();
+    const connectionsWithEntity = relatedConns.map(conn => {
+      const targetId = conn.fromId === relation.id ? conn.toId : conn.fromId;
+      const entity = this.state.elements.get(targetId);
+      if (entity) connectedEntityIds.add(entity.id);
+      return { conn, targetId, entity };
+    });
+
+    const availableEntitiesToConnect = allEntities.filter(e => !connectedEntityIds.has(e.id));
 
     this.panel.innerHTML = `
       <div class="panel-header">
@@ -401,68 +411,97 @@ class ContextPanel {
           <input type="text" id="input-relation-name" class="form-input" value="${relation.name}" placeholder="Ex: Contém, Pertence, Realiza" />
         </div>
 
-        <!-- Source Entity Dropdown -->
-        <div class="panel-section" style="background: var(--bg-surface-elevated); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
-          <span class="section-label" style="margin-bottom: 0.35rem;">Entidade de Origem</span>
-          <div class="form-group">
-            <select id="select-rel-source-entity" class="form-select">
-              <option value="">-- Selecione uma Entidade --</option>
-              ${allEntities.map(ent => `
-                <option value="${ent.id}" ${ent.id === sourceEntityId ? 'selected' : ''}>${ent.name}</option>
-              `).join('')}
-            </select>
+        <!-- Participating Entities Section -->
+        <div class="panel-section">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <span class="section-label" style="margin-bottom: 0;">Entidades Conectadas (${connectionsWithEntity.length})</span>
           </div>
-          ${conn1 ? `
-            <div class="form-group" style="margin-top: 0.35rem;">
-              <label class="form-label">Cardinalidade Origem:</label>
-              <select id="select-rel-source-card" class="form-select select-cardinality" data-conn-id="${conn1.id}">
-                <option value="1" ${conn1.cardinalityTo === '1' ? 'selected' : ''}>1 (Um)</option>
-                <option value="N" ${conn1.cardinalityTo === 'N' ? 'selected' : ''}>N (Muitos)</option>
-                <option value="(0,1)" ${conn1.cardinalityTo === '(0,1)' ? 'selected' : ''}>(0,1) Opcional Um</option>
-                <option value="(1,1)" ${conn1.cardinalityTo === '(1,1)' ? 'selected' : ''}>(1,1) Obrigatório Um</option>
-                <option value="(0,n)" ${conn1.cardinalityTo === '(0,n)' ? 'selected' : ''}>(0,n) Opcional Muitos</option>
-                <option value="(1,n)" ${conn1.cardinalityTo === '(1,n)' ? 'selected' : ''}>(1,n) Obrigatório Muitos</option>
+
+          <div class="relation-participants-list" style="display: flex; flex-direction: column; gap: 0.6rem;">
+            ${connectionsWithEntity.length === 0 ? `
+              <p style="font-size: var(--font-size-xs); color: var(--text-muted); padding: 0.25rem 0;">Nenhuma entidade conectada a este relacionamento.</p>
+            ` : connectionsWithEntity.map((item, idx) => `
+              <div class="participant-item-box" style="background: var(--bg-surface-elevated); padding: 0.65rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                  <span style="font-size: var(--font-size-xs); font-weight: 600; color: var(--text-main);">
+                    ${idx === 0 ? 'Origem' : idx === 1 ? 'Destino' : `Participante ${idx + 1}`}
+                  </span>
+                  <button type="button" class="btn btn-danger btn-sm btn-icon btn-remove-conn" data-conn-id="${item.conn.id}" title="Desconectar Entidade" style="width: 20px; height: 20px; min-height: 20px; font-size: 11px;">✕</button>
+                </div>
+                <div class="form-group" style="margin-bottom: 0.35rem;">
+                  <select class="form-select select-rel-entity-change" data-conn-id="${item.conn.id}">
+                    <option value="">-- Selecione uma Entidade --</option>
+                    ${allEntities.map(ent => `
+                      <option value="${ent.id}" ${ent.id === item.targetId ? 'selected' : ''}>${ent.name}</option>
+                    `).join('')}
+                  </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label class="form-label" style="font-size: 10px;">Cardinalidade:</label>
+                  <select class="form-select select-cardinality" data-conn-id="${item.conn.id}">
+                    <option value="1" ${item.conn.cardinalityTo === '1' ? 'selected' : ''}>1 (Um)</option>
+                    <option value="N" ${item.conn.cardinalityTo === 'N' ? 'selected' : ''}>N (Muitos)</option>
+                    <option value="(0,1)" ${item.conn.cardinalityTo === '(0,1)' ? 'selected' : ''}>(0,1) Opcional Um</option>
+                    <option value="(1,1)" ${item.conn.cardinalityTo === '(1,1)' ? 'selected' : ''}>(1,1) Obrigatório Um</option>
+                    <option value="(0,n)" ${item.conn.cardinalityTo === '(0,n)' ? 'selected' : ''}>(0,n) Opcional Muitos</option>
+                    <option value="(1,n)" ${item.conn.cardinalityTo === '(1,n)' ? 'selected' : ''}>(1,n) Obrigatório Muitos</option>
+                  </select>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          ${availableEntitiesToConnect.length > 0 ? `
+            <div style="display: flex; gap: 0.35rem; margin-top: 0.6rem;">
+              <select id="select-add-new-participant" class="form-select">
+                <option value="">+ Conectar Nova Entidade...</option>
+                ${availableEntitiesToConnect.map(e => `<option value="${e.id}">${e.name}</option>`).join('')}
               </select>
+              <button type="button" id="btn-add-participant" class="btn btn-secondary btn-sm" style="white-space: nowrap;">Conectar</button>
             </div>
           ` : ''}
         </div>
 
-        <!-- Target Entity Dropdown -->
-        <div class="panel-section" style="background: var(--bg-surface-elevated); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
-          <span class="section-label" style="margin-bottom: 0.35rem;">Entidade de Destino</span>
-          <div class="form-group">
-            <select id="select-rel-target-entity" class="form-select">
-              <option value="">-- Selecione uma Entidade --</option>
-              ${allEntities.map(ent => `
-                <option value="${ent.id}" ${ent.id === targetEntityId ? 'selected' : ''}>${ent.name}</option>
-              `).join('')}
-            </select>
-          </div>
-          ${conn2 ? `
-            <div class="form-group" style="margin-top: 0.35rem;">
-              <label class="form-label">Cardinalidade Destino:</label>
-              <select id="select-rel-target-card" class="form-select select-cardinality" data-conn-id="${conn2.id}">
-                <option value="N" ${conn2.cardinalityTo === 'N' ? 'selected' : ''}>N (Muitos)</option>
-                <option value="1" ${conn2.cardinalityTo === '1' ? 'selected' : ''}>1 (Um)</option>
-                <option value="(0,1)" ${conn2.cardinalityTo === '(0,1)' ? 'selected' : ''}>(0,1) Opcional Um</option>
-                <option value="(1,1)" ${conn2.cardinalityTo === '(1,1)' ? 'selected' : ''}>(1,1) Obrigatório Um</option>
-                <option value="(0,n)" ${conn2.cardinalityTo === '(0,n)' ? 'selected' : ''}>(0,n) Opcional Muitos</option>
-                <option value="(1,n)" ${conn2.cardinalityTo === '(1,n)' ? 'selected' : ''}>(1,n) Obrigatório Muitos</option>
-              </select>
+        <!-- Relationship Attributes Section -->
+        <div class="panel-section" style="border-top: 1px solid var(--border-subtle); padding-top: 0.75rem;">
+          <div class="quick-attribute-box" style="margin-bottom: 0.75rem;">
+            <span class="section-label">Adicionar Atributo ao Relacionamento</span>
+            <div style="display: flex; gap: 0.375rem;">
+              <input type="text" id="input-rel-attr-name" class="form-input" placeholder="Ex: data_registro, quantidade..." />
+              <button type="button" id="btn-add-rel-attr" class="btn btn-primary btn-sm" style="padding: 0 0.875rem;">+ Adicionar</button>
             </div>
-          ` : ''}
-        </div>
+          </div>
 
-        <button id="btn-add-rel-attr" class="btn btn-secondary btn-block">
-          + Adicionar Atributo ao Relacionamento
-        </button>
+          <span class="section-label">
+            Atributos Vinculados (${attachedAttrs.length})
+          </span>
+          <div class="attributes-list" id="attached-rel-attrs-list">
+            ${attachedAttrs.length === 0 ? `
+              <p style="font-size: var(--font-size-xs); color: var(--text-muted); padding: 0.5rem 0;">Nenhum atributo no relacionamento.</p>
+            ` : attachedAttrs.map(attr => `
+              <div class="attribute-item-row" data-attr-id="${attr.id}">
+                <div class="attribute-item-name">
+                  <span class="badge badge-col">${attr.name}</span>
+                </div>
+                <div style="display: flex; gap: 0.25rem;">
+                  <button class="btn btn-secondary btn-sm btn-icon btn-edit-attr" title="Editar Atributo">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                  </button>
+                  <button class="btn btn-danger btn-sm btn-icon btn-remove-attr" title="Excluir Atributo">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                  </button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
       </div>
     `;
 
-    this.bindRelationEvents(relation, conn1, conn2);
+    this.bindRelationEvents(relation);
   }
 
-  bindRelationEvents(relation, conn1, conn2) {
+  bindRelationEvents(relation) {
     const inputName = this.panel.querySelector('#input-relation-name');
     const titleText = this.panel.querySelector('.panel-title-text');
 
@@ -499,43 +538,50 @@ class ContextPanel {
       });
     }
 
-    // Change Source Entity
-    const selSource = this.panel.querySelector('#select-rel-source-entity');
-    if (selSource) {
-      selSource.addEventListener('change', (e) => {
-        const newSourceId = e.target.value;
-        if (conn1) {
-          this.state.removeConnection(conn1.id, false);
+    // Change connected entity in existing connection
+    this.panel.querySelectorAll('.select-rel-entity-change').forEach(sel => {
+      sel.addEventListener('change', (e) => {
+        const connId = sel.getAttribute('data-conn-id');
+        const newEntityId = e.target.value;
+        const conn = this.state.connections.find(c => c.id === connId);
+        if (conn && newEntityId) {
+          if (conn.fromId === relation.id) {
+            conn.toId = newEntityId;
+          } else {
+            conn.fromId = newEntityId;
+          }
+          this.state.pushSnapshot();
+          this.state.emit('change', { type: 'connection:updated', conn });
+          this.render();
         }
-        if (newSourceId) {
-          this.state.addConnection({
-            fromId: newSourceId,
-            toId: relation.id,
-            type: 'relationship',
-            cardinalityTo: '1'
-          });
-        }
+      });
+    });
+
+    // Remove connection
+    this.panel.querySelectorAll('.btn-remove-conn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const connId = btn.getAttribute('data-conn-id');
+        this.state.removeConnection(connId);
         this.render();
       });
-    }
+    });
 
-    // Change Target Entity
-    const selTarget = this.panel.querySelector('#select-rel-target-entity');
-    if (selTarget) {
-      selTarget.addEventListener('change', (e) => {
-        const newTargetId = e.target.value;
-        if (conn2) {
-          this.state.removeConnection(conn2.id, false);
-        }
-        if (newTargetId) {
+    // Add new participating entity to relation
+    const btnAddParticipant = this.panel.querySelector('#btn-add-participant');
+    const selAddParticipant = this.panel.querySelector('#select-add-new-participant');
+
+    if (btnAddParticipant && selAddParticipant) {
+      btnAddParticipant.addEventListener('click', () => {
+        const entityId = selAddParticipant.value;
+        if (entityId) {
           this.state.addConnection({
             fromId: relation.id,
-            toId: newTargetId,
+            toId: entityId,
             type: 'relationship',
             cardinalityTo: 'N'
           });
+          this.render();
         }
-        this.render();
       });
     }
 
@@ -546,17 +592,40 @@ class ContextPanel {
         const conn = this.state.connections.find(c => c.id === connId);
         if (conn) {
           conn.cardinalityTo = e.target.value;
+          this.state.pushSnapshot();
           this.state.emit('change', { type: 'cardinality:updated', conn });
         }
       });
     });
 
+    // Add attribute to relationship
+    const inputRelAttr = this.panel.querySelector('#input-rel-attr-name');
     const btnAddRelAttr = this.panel.querySelector('#btn-add-rel-attr');
+
+    const handleAddRelAttr = () => {
+      const name = inputRelAttr.value.trim();
+      this.state.addAttribute(relation.id, {
+        name: name || undefined,
+        attrType: 'simple'
+      });
+      inputRelAttr.value = '';
+      inputRelAttr.focus();
+      this.render();
+    };
+
     if (btnAddRelAttr) {
-      btnAddRelAttr.addEventListener('click', () => {
-        this.state.addAttribute(relation.id, { name: 'data_registro', attrType: 'simple' });
+      btnAddRelAttr.addEventListener('click', handleAddRelAttr);
+    }
+    if (inputRelAttr) {
+      inputRelAttr.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleAddRelAttr();
+        }
       });
     }
+
+    this.bindAttributeRowButtons();
   }
 
   // ------------------------------------------------------------------------
@@ -595,6 +664,13 @@ class ContextPanel {
             <option value="multivalued" ${attr.attrType === 'multivalued' ? 'selected' : ''}>Multivalorado (Ex: Telefones)</option>
             <option value="derived" ${attr.attrType === 'derived' ? 'selected' : ''}>Derivado / Calculado (Ex: Idade)</option>
             <option value="composite" ${attr.attrType === 'composite' ? 'selected' : ''}>Composto (Ex: Endereço)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Tipo de Dado SQL</label>
+          <select id="select-attr-sql-type" class="form-select">
+            ${this.renderSqlTypeOptions(attr.sqlType || (attr.attrType === 'primary' ? 'INT' : 'VARCHAR(255)'))}
           </select>
         </div>
 
@@ -668,6 +744,14 @@ class ContextPanel {
       });
     }
 
+    const selectSqlType = this.panel.querySelector('#select-attr-sql-type');
+    if (selectSqlType) {
+      selectSqlType.addEventListener('change', (e) => {
+        this.state.updateElement(attr.id, { sqlType: e.target.value });
+        this.state.emit('change', { type: 'attribute:sql-type' });
+      });
+    }
+
     // Add Sub-attribute handler
     const inputSubName = this.panel.querySelector('#input-sub-attr-name');
     const btnAddSub = this.panel.querySelector('#btn-add-sub-attr');
@@ -726,6 +810,51 @@ class ContextPanel {
         this.state.select(attr.parentId);
       });
     }
+  }
+
+  renderSqlTypeOptions(selectedType) {
+    const type = (selectedType || 'VARCHAR(255)').toUpperCase();
+    const groups = [
+      {
+        label: 'Numéricos Inteiros',
+        types: ['INT', 'BIGINT', 'SMALLINT', 'TINYINT']
+      },
+      {
+        label: 'Precisão / Decimais',
+        types: ['DECIMAL(10,2)', 'NUMERIC(12,2)', 'FLOAT', 'DOUBLE']
+      },
+      {
+        label: 'Textuais e Caracteres',
+        types: ['VARCHAR(255)', 'VARCHAR(100)', 'CHAR(36)', 'TEXT', 'LONGTEXT']
+      },
+      {
+        label: 'Data e Hora',
+        types: ['DATE', 'TIME', 'DATETIME', 'TIMESTAMP']
+      },
+      {
+        label: 'Especiais e Modernos',
+        types: ['BOOLEAN', 'UUID', 'JSON', 'BLOB']
+      }
+    ];
+
+    let html = '';
+    let found = false;
+
+    groups.forEach(group => {
+      html += `<optgroup label="${group.label}">`;
+      group.types.forEach(t => {
+        const isSel = (type === t || (t.startsWith('VARCHAR') && type.startsWith('VARCHAR') && t === 'VARCHAR(255)' && !type.includes('100')));
+        if (isSel) found = true;
+        html += `<option value="${t}" ${isSel ? 'selected' : ''}>${t}</option>`;
+      });
+      html += `</optgroup>`;
+    });
+
+    if (!found && selectedType) {
+      html = `<option value="${selectedType}" selected>${selectedType}</option>` + html;
+    }
+
+    return html;
   }
 
   // ------------------------------------------------------------------------

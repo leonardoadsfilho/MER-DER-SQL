@@ -26,6 +26,8 @@ class App {
     // 4. Services
     this.relational = new window.RelationalEngine();
     this.sqlGen = new window.SqlGenerator(this.relational);
+    this.sqlParser = new window.SqlParser();
+    this.reverseEngineering = new window.ReverseEngineeringService(this.state, this.sqlParser);
     this.storage = new window.StorageService(this.state);
     this.exportPng = new window.ExportPngService(svgElement, this.theme, this.storage);
 
@@ -69,18 +71,21 @@ class App {
       this.sqlGen
     );
     this.state.on('change', () => {
+      this.updateStatusBar();
       if (this.tabs.activeTab !== 'sql') return;
       const output = document.getElementById('sql-code-output');
-      if (output) output.value = this.sqlGen.generateDDL(this.state);
+      if (output) output.innerHTML = this.sqlGen.generateDDL(this.state, true);
     });
+    this.state.on('viewport:changed', () => this.updateStatusBar());
 
     // 9. Bind Header Actions
     this.bindHeaderActions();
 
     // 10. Initial Diagram or Load Autosave
     this.loadInitialDiagram();
+    this.updateStatusBar();
 
-    console.log('🚀 MER Studio v1.0 operacional.');
+    console.log('🚀 MER Studio v2.1 operacional.');
   }
 
   bindHeaderActions() {
@@ -193,6 +198,125 @@ class App {
       });
     }
 
+    // Reverse Engineering: Import SQL Modal & File Upload
+    const btnOpenSqlImport = document.getElementById('btn-import-sql-modal');
+    const btnUploadSqlDirect = document.getElementById('btn-upload-sql-direct');
+    const modalSqlImport = document.getElementById('modal-sql-import');
+    const btnCloseSqlImport = document.getElementById('btn-close-sql-import');
+    const btnCancelSqlImport = document.getElementById('btn-cancel-sql-import');
+    const btnConfirmSqlImport = document.getElementById('btn-confirm-sql-import');
+    const textareaImportSql = document.getElementById('textarea-import-sql');
+    const inputSqlFileUpload = document.getElementById('input-sql-file-upload');
+    const btnBrowseSqlFile = document.getElementById('btn-browse-sql-file');
+    const dropzoneSql = document.getElementById('dropzone-sql-file');
+    const selectedFileName = document.getElementById('sql-file-selected-name');
+
+    const closeImportModal = () => {
+      if (modalSqlImport) modalSqlImport.classList.remove('active');
+      if (selectedFileName) selectedFileName.style.display = 'none';
+    };
+
+    if (btnOpenSqlImport && modalSqlImport) {
+      btnOpenSqlImport.addEventListener('click', () => {
+        modalSqlImport.classList.add('active');
+        if (textareaImportSql) {
+          setTimeout(() => textareaImportSql.focus(), 100);
+        }
+      });
+    }
+
+    if (btnBrowseSqlFile && inputSqlFileUpload) {
+      btnBrowseSqlFile.addEventListener('click', () => inputSqlFileUpload.click());
+    }
+
+    if (btnUploadSqlDirect && inputSqlFileUpload) {
+      btnUploadSqlDirect.addEventListener('click', () => inputSqlFileUpload.click());
+    }
+
+    const processSqlFile = (file) => {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target.result;
+        if (textareaImportSql) textareaImportSql.value = content;
+        if (selectedFileName) {
+          selectedFileName.textContent = `Arquivo carregado: ${file.name} (${Math.round(file.size / 1024 * 10) / 10} KB)`;
+          selectedFileName.style.display = 'block';
+        }
+        if (modalSqlImport && !modalSqlImport.classList.contains('active')) {
+          modalSqlImport.classList.add('active');
+        }
+        this.modals.showToast(`Arquivo "${file.name}" carregado. Clique em Gerar Diagramas para confirmar.`, 'info');
+      };
+      reader.onerror = () => {
+        this.modals.showToast('Erro ao ler o arquivo SQL.', 'error');
+      };
+      reader.readAsText(file, 'UTF-8');
+    };
+
+    if (inputSqlFileUpload) {
+      inputSqlFileUpload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          processSqlFile(file);
+          inputSqlFileUpload.value = '';
+        }
+      });
+    }
+
+    // Drag and Drop on Dropzone
+    if (dropzoneSql) {
+      dropzoneSql.addEventListener('click', (e) => {
+        if (e.target !== btnBrowseSqlFile && inputSqlFileUpload) {
+          inputSqlFileUpload.click();
+        }
+      });
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropzoneSql.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzoneSql.classList.add('drag-active');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropzoneSql.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzoneSql.classList.remove('drag-active');
+        });
+      });
+
+      dropzoneSql.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const file = dt && dt.files[0];
+        if (file) {
+          processSqlFile(file);
+        }
+      });
+    }
+
+    if (btnCloseSqlImport) btnCloseSqlImport.addEventListener('click', closeImportModal);
+    if (btnCancelSqlImport) btnCancelSqlImport.addEventListener('click', closeImportModal);
+
+    if (btnConfirmSqlImport && textareaImportSql) {
+      btnConfirmSqlImport.addEventListener('click', () => {
+        const sqlText = textareaImportSql.value;
+        const result = this.reverseEngineering.importSql(sqlText);
+
+        if (result.success) {
+          closeImportModal();
+          textareaImportSql.value = '';
+          this.modals.showToast(`Engenharia Reversa concluída! ${result.tablesCount} tabela(s) importada(s).`, 'success');
+          // Switch to conceptual MER diagram tab so the user sees the generated model
+          this.tabs.switchTab('conceptual');
+        } else {
+          this.modals.showToast(result.error || 'Erro ao importar SQL.', 'error');
+        }
+      });
+    }
+
     // Clear Diagram
     const btnClearDiagram = document.getElementById('btn-clear-canvas');
     if (btnClearDiagram) {
@@ -207,6 +331,27 @@ class App {
 
   loadInitialDiagram() {
     this.storage.loadLocal();
+  }
+
+  updateStatusBar() {
+    const summaryEl = document.getElementById('status-model-summary');
+    const zoomEl = document.getElementById('status-zoom-level');
+    if (!summaryEl) return;
+
+    let entityCount = 0;
+    let relationCount = 0;
+    this.state.elements.forEach(el => {
+      if (el.type === 'entity') entityCount++;
+      else if (el.type === 'relation') relationCount++;
+    });
+
+    const tables = this.relational ? this.relational.generateRelationalSchema(this.state) : [];
+    summaryEl.textContent = `${entityCount} Entidade(s) | ${relationCount} Relação(ões) | ${tables.length} Tabela(s)`;
+
+    if (zoomEl) {
+      const currentZoom = Math.round((this.state.viewport.zoom || 1) * 100);
+      zoomEl.textContent = `Zoom: ${currentZoom}%`;
+    }
   }
 }
 

@@ -101,7 +101,7 @@ class RelationalEngine {
       }
     });
 
-    // 2. Process Relationships (1:1, 1:N, N:N)
+    // 2. Process Relationships (1:1, 1:N, N:N, and N-ary)
     state.elements.forEach(rel => {
       if (rel.type === 'relation') {
         const relConns = state.connections.filter(
@@ -121,7 +121,68 @@ class RelationalEngine {
           }
         });
 
-        if (connectedEntities.length === 2) {
+        const relAttrs = state.getAttributesFor(rel.id);
+
+        // Case A: N-ary (more than 2 entities) or N:N binary
+        if (connectedEntities.length > 2) {
+          // N-ary relationship -> Always creates an Associative / Intermediate Table
+          const connectedTables = connectedEntities.map(ent => ({
+            ent,
+            table: tablesMap.get(this.sanitizeIdentifier(ent.entity.name))
+          })).filter(item => Boolean(item.table));
+
+          if (connectedTables.length >= 2) {
+            const defaultName = connectedTables.map(item => item.table.name).join('_');
+            const hasCustomName = rel.name &&
+              !rel.name.toLowerCase().startsWith('relaciona_') &&
+              !rel.name.toLowerCase().startsWith('rel_') &&
+              rel.name !== 'Nova_Relacao';
+            const assocTableName = hasCustomName ? this.sanitizeIdentifier(rel.name) : defaultName;
+
+            const assocColumns = [];
+            const usedColNames = new Set();
+
+            connectedTables.forEach((item, idx) => {
+              const { table } = item;
+              const pkCol = table.columns.find(c => c.isPk) || { name: `id_${table.name.toLowerCase()}`, type: 'INT' };
+              let fkColName = `fk_${table.name.toLowerCase()}_${pkCol.name}`;
+              if (usedColNames.has(fkColName)) {
+                fkColName = `${fkColName}_${idx + 1}`;
+              }
+              usedColNames.add(fkColName);
+
+              assocColumns.push({
+                name: fkColName,
+                type: pkCol.type,
+                isPk: true,
+                isFk: true,
+                refTable: table.name,
+                refColumn: pkCol.name
+              });
+            });
+
+            // Add relationship attributes to the associative table
+            relAttrs.forEach(rAttr => {
+              const attrColName = this.sanitizeIdentifier(rAttr.name);
+              if (!assocColumns.some(c => c.name === attrColName)) {
+                assocColumns.push({
+                  name: attrColName,
+                  type: rAttr.sqlType || this.guessDataType(rAttr.name),
+                  isPk: false,
+                  isFk: false,
+                  isNullable: true
+                });
+              }
+            });
+
+            tablesMap.set(assocTableName, {
+              id: rel.id,
+              name: assocTableName,
+              isAssociative: true,
+              columns: assocColumns
+            });
+          }
+        } else if (connectedEntities.length === 2) {
           const [entA, entB] = connectedEntities;
           const tableA = tablesMap.get(this.sanitizeIdentifier(entA.entity.name));
           const tableB = tablesMap.get(this.sanitizeIdentifier(entB.entity.name));
@@ -132,30 +193,40 @@ class RelationalEngine {
 
             // N:N Relationship -> Creates Associative Table
             if (isManyA && isManyB) {
-              const assocTableName = `${tableA.name}_${tableB.name}`;
+              const hasCustomName = rel.name &&
+                !rel.name.toLowerCase().startsWith('relaciona_') &&
+                !rel.name.toLowerCase().startsWith('rel_') &&
+                rel.name !== 'Nova_Relacao';
+              const assocTableName = hasCustomName ? this.sanitizeIdentifier(rel.name) : `${tableA.name}_${tableB.name}`;
+
               const pkColA = tableA.columns.find(c => c.isPk) || { name: `id_${tableA.name.toLowerCase()}`, type: 'INT' };
               const pkColB = tableB.columns.find(c => c.isPk) || { name: `id_${tableB.name.toLowerCase()}`, type: 'INT' };
 
-              const fkColA = `fk_${pkColA.name}`;
-              const fkColB = `fk_${pkColB.name}`;
+              const fkColA = `fk_${tableA.name.toLowerCase()}_${pkColA.name}`;
+              let fkColB = `fk_${tableB.name.toLowerCase()}_${pkColB.name}`;
+              if (fkColB === fkColA) fkColB = `fk_${tableB.name.toLowerCase()}_${pkColB.name}_2`;
 
               const assocColumns = [
                 { name: fkColA, type: pkColA.type, isPk: true, isFk: true, refTable: tableA.name, refColumn: pkColA.name },
                 { name: fkColB, type: pkColB.type, isPk: true, isFk: true, refTable: tableB.name, refColumn: pkColB.name }
               ];
 
-              const relAttrs = state.getAttributesFor(rel.id);
+              // Add relationship attributes to associative table
               relAttrs.forEach(rAttr => {
-                assocColumns.push({
-                  name: this.sanitizeIdentifier(rAttr.name),
-                  type: this.guessDataType(rAttr.name),
-                  isPk: false,
-                  isFk: false,
-                  isNullable: true
-                });
+                const attrColName = this.sanitizeIdentifier(rAttr.name);
+                if (!assocColumns.some(c => c.name === attrColName)) {
+                  assocColumns.push({
+                    name: attrColName,
+                    type: rAttr.sqlType || this.guessDataType(rAttr.name),
+                    isPk: false,
+                    isFk: false,
+                    isNullable: true
+                  });
+                }
               });
 
               tablesMap.set(assocTableName, {
+                id: rel.id,
                 name: assocTableName,
                 isAssociative: true,
                 columns: assocColumns
@@ -177,6 +248,20 @@ class RelationalEngine {
                   isNullable: true
                 });
               }
+
+              // Relationship attributes migrate to dependent table (tableB)
+              relAttrs.forEach(rAttr => {
+                const attrColName = this.sanitizeIdentifier(rAttr.name);
+                if (!tableB.columns.some(c => c.name === attrColName)) {
+                  tableB.columns.push({
+                    name: attrColName,
+                    type: rAttr.sqlType || this.guessDataType(rAttr.name),
+                    isPk: false,
+                    isFk: false,
+                    isNullable: true
+                  });
+                }
+              });
             } else if (isManyA && !isManyB) {
               const pkColB = tableB.columns.find(c => c.isPk) || { name: `id_${tableB.name.toLowerCase()}`, type: 'INT' };
               const fkName = `fk_${pkColB.name}`;
@@ -192,6 +277,20 @@ class RelationalEngine {
                   isNullable: true
                 });
               }
+
+              // Relationship attributes migrate to dependent table (tableA)
+              relAttrs.forEach(rAttr => {
+                const attrColName = this.sanitizeIdentifier(rAttr.name);
+                if (!tableA.columns.some(c => c.name === attrColName)) {
+                  tableA.columns.push({
+                    name: attrColName,
+                    type: rAttr.sqlType || this.guessDataType(rAttr.name),
+                    isPk: false,
+                    isFk: false,
+                    isNullable: true
+                  });
+                }
+              });
             }
             // 1:1 Relationship
             else {
@@ -210,6 +309,20 @@ class RelationalEngine {
                   isNullable: true
                 });
               }
+
+              // Relationship attributes migrate to receiving table (tableB)
+              relAttrs.forEach(rAttr => {
+                const attrColName = this.sanitizeIdentifier(rAttr.name);
+                if (!tableB.columns.some(c => c.name === attrColName)) {
+                  tableB.columns.push({
+                    name: attrColName,
+                    type: rAttr.sqlType || this.guessDataType(rAttr.name),
+                    isPk: false,
+                    isFk: false,
+                    isNullable: true
+                  });
+                }
+              });
             }
           }
         }
@@ -249,12 +362,20 @@ class RelationalEngine {
 
   guessDataType(columnName) {
     const lower = (columnName || '').toLowerCase();
+    if (lower.endsWith('_uuid') || lower === 'uuid' || lower.startsWith('uuid_')) return 'UUID';
+    if (lower.includes('json') || lower.includes('payload') || lower.includes('metadados') || lower.includes('config')) return 'JSON';
     if (lower.startsWith('id_') || lower.endsWith('_id') || lower === 'id') return 'INT';
-    if (lower.includes('data') || lower.includes('date') || lower.includes('criado_em')) return 'DATETIME';
+    if (lower.includes('timestamp')) return 'TIMESTAMP';
+    if (lower.includes('hora') || lower.startsWith('hr_') || lower.includes('time')) return 'TIME';
+    if (lower.startsWith('data_') || lower.endsWith('_data') || lower.includes('date') || lower.includes('nascimento')) return 'DATE';
+    if (lower.includes('criado_em') || lower.includes('atualizado_em')) return 'DATETIME';
     if (lower.includes('valor') || lower.includes('preco') || lower.includes('salario') || lower.includes('total')) return 'DECIMAL(10,2)';
+    if (lower.includes('taxa') || lower.includes('peso') || lower.includes('altura') || lower.includes('percentual')) return 'FLOAT';
+    if (lower.includes('grande') || lower.includes('big') || lower.includes('contador')) return 'BIGINT';
     if (lower.includes('idade') || lower.includes('quantidade') || lower.includes('qtd') || lower.includes('numero') || lower.includes('cep')) return 'INT';
     if (lower.includes('ativo') || lower.includes('status') || lower.startsWith('is_')) return 'BOOLEAN';
-    if (lower.includes('descricao') || lower.includes('observacao') || lower.includes('texto')) return 'TEXT';
+    if (lower.includes('arquivo') || lower.includes('anexo') || lower.includes('foto') || lower.includes('imagem') || lower.includes('blob')) return 'BLOB';
+    if (lower.includes('descricao') || lower.includes('observacao') || lower.includes('texto') || lower.includes('conteudo')) return 'TEXT';
     return 'VARCHAR(255)';
   }
 }
